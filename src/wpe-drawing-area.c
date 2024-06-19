@@ -23,6 +23,7 @@
 #include "wpe-drawing-area.h"
 
 #include "wpe-display-gtk.h"
+#include "wpe-toplevel-gtk.h"
 
 enum {
   PROP_0,
@@ -37,110 +38,12 @@ static GParamSpec *properties[N_PROPS];
 struct _WPEDrawingArea {
   GtkWidget parent;
 
-  GtkWindow *toplevel;
-  GdkToplevelState toplevel_state;
-  GList *toplevel_monitors;
-  GdkMonitor *current_monitor;
-
   WPEView *view;
   WPEBuffer *pending_buffer;
   WPEBuffer *committed_buffer;
 };
 
 G_DEFINE_FINAL_TYPE(WPEDrawingArea, wpe_drawing_area, GTK_TYPE_WIDGET)
-
-static void wpe_drawing_area_toplevel_state_changed(GdkSurface *surface, GParamSpec *pspec, WPEDrawingArea *area)
-{
-  GdkToplevelState toplevel_state = gdk_toplevel_get_state(GDK_TOPLEVEL(surface));
-  int mask = area->toplevel_state ^ toplevel_state;
-  area->toplevel_state = toplevel_state;
-
-  WPEViewState state = wpe_view_get_state(area->view);
-  if (mask & GDK_TOPLEVEL_STATE_FULLSCREEN) {
-    if (toplevel_state & GDK_TOPLEVEL_STATE_FULLSCREEN)
-      state |= WPE_VIEW_STATE_FULLSCREEN;
-    else
-      state &= ~WPE_VIEW_STATE_FULLSCREEN;
-  }
-
-  if (mask & GDK_TOPLEVEL_STATE_MAXIMIZED) {
-    if (toplevel_state & GDK_TOPLEVEL_STATE_MAXIMIZED)
-      state |= WPE_VIEW_STATE_MAXIMIZED;
-    else
-      state &= ~WPE_VIEW_STATE_MAXIMIZED;
-  }
-
-  wpe_view_state_changed(area->view, state);
-}
-
-static void wpe_drawing_area_toplevel_entered_monitor(GdkSurface *surface, GdkMonitor *monitor, WPEDrawingArea *area)
-{
-  area->toplevel_monitors = g_list_append(area->toplevel_monitors, monitor);
-  if (area->current_monitor != monitor) {
-    area->current_monitor = monitor;
-    g_object_notify(G_OBJECT(area->view), "monitor");
-  }
-}
-
-static void wpe_drawing_area_toplevel_left_monitor(GdkSurface *surface, GdkMonitor *monitor, WPEDrawingArea *area)
-{
-  area->toplevel_monitors = g_list_remove(area->toplevel_monitors, monitor);
-  GdkMonitor *current_monitor = gdk_display_get_monitor_at_surface(gtk_widget_get_display(GTK_WIDGET(area)), surface);
-  if (area->current_monitor != current_monitor) {
-    area->current_monitor = current_monitor;
-    g_object_notify(G_OBJECT(area->view), "monitor");
-  }
-}
-
-static void wpe_drawing_area_connect_toplevel_surface_signals(WPEDrawingArea *area)
-{
-  GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(area->toplevel));
-  area->toplevel_state = gdk_toplevel_get_state(GDK_TOPLEVEL(surface));
-  g_signal_connect(surface, "notify::state", G_CALLBACK(wpe_drawing_area_toplevel_state_changed), area);
-  area->current_monitor = gdk_display_get_monitor_at_surface(gtk_widget_get_display(GTK_WIDGET(area)), surface);
-  if (area->current_monitor)
-    g_object_notify(G_OBJECT(area->view), "monitor");
-  g_signal_connect(surface, "enter-monitor", G_CALLBACK(wpe_drawing_area_toplevel_entered_monitor), area);
-  g_signal_connect(surface, "leave-monitor", G_CALLBACK(wpe_drawing_area_toplevel_left_monitor), area);
-}
-
-static void wpe_drawing_area_disconnect_toplevel_surface_signals(WPEDrawingArea *area)
-{
-  GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(area->toplevel));
-  g_signal_handlers_disconnect_by_data(surface, area);
-}
-
-static void wpe_drawing_area_toplevel_realized(WPEDrawingArea *area)
-{
-  wpe_drawing_area_connect_toplevel_surface_signals(area);
-}
-
-static void wpe_drawing_area_toplevel_unrealized(WPEDrawingArea *area)
-{
-  wpe_drawing_area_disconnect_toplevel_surface_signals(area);
-}
-
-static void wpe_drawing_area_set_toplevel(WPEDrawingArea *area, GtkWindow *toplevel)
-{
-  if (area->toplevel == toplevel)
-    return;
-
-  if (area->toplevel) {
-    g_signal_handlers_disconnect_by_data(area->toplevel, area);
-    if (gtk_widget_get_realized(GTK_WIDGET(area->toplevel)))
-      wpe_drawing_area_disconnect_toplevel_surface_signals(area);
-  }
-
-  area->toplevel = toplevel;
-
-  if (area->toplevel) {
-    if (gtk_widget_get_realized(GTK_WIDGET(area->toplevel)))
-      wpe_drawing_area_connect_toplevel_surface_signals(area);
-    else
-      g_signal_connect_swapped(area->toplevel, "realize", G_CALLBACK(wpe_drawing_area_toplevel_realized), area);
-    g_signal_connect_swapped(area->toplevel, "unrealize", G_CALLBACK(wpe_drawing_area_toplevel_unrealized), area);
-  }
-}
 
 typedef struct {
   GdkDmabufTextureBuilder *builder;
@@ -181,46 +84,12 @@ static WPEBufferGtk *wpe_buffer_gtk_create(WPEBuffer *buffer)
   return NULL;
 }
 
-static gboolean wpe_buffer_gtk_update(WPEBufferGtk *buffer_gtk, WPEBuffer *buffer, GError **error)
-{
-  if (buffer_gtk->builder) {
-    g_autoptr(GError) buffer_error = NULL;
-    g_set_object(&buffer_gtk->texture, gdk_dmabuf_texture_builder_build(buffer_gtk->builder, NULL, NULL, &buffer_error));
-    if (!buffer_gtk->texture) {
-      g_set_error(error, WPE_VIEW_ERROR, WPE_VIEW_ERROR_RENDER_FAILED, "Failed to render buffer: failed to build DMA-BUF texture: %s", buffer_error->message);
-      return FALSE;
-    }
-  } else {
-    g_set_object(&buffer_gtk->texture, gdk_memory_texture_new(wpe_buffer_get_width(buffer),
-                                                              wpe_buffer_get_height(buffer),
-                                                              GDK_MEMORY_DEFAULT,
-                                                              wpe_buffer_shm_get_data(WPE_BUFFER_SHM(buffer)),
-                                                              wpe_buffer_shm_get_stride(WPE_BUFFER_SHM(buffer))));
-  }
-
-  return TRUE;
-}
-
 static void wpe_buffer_gtk_free(WPEBufferGtk *buffer_gtk)
 {
   g_clear_object(&buffer_gtk->builder);
   g_clear_object(&buffer_gtk->texture);
 
   g_free(buffer_gtk);
-}
-
-static void wpe_drawing_area_scale_changed(WPEDrawingArea *area, GParamSpec *spec, gpointer user_data)
-{
-  wpe_view_scale_changed(area->view, gtk_widget_get_scale_factor(GTK_WIDGET(area)));
-}
-
-static void wpe_drawing_area_constructed(GObject *object)
-{
-  G_OBJECT_CLASS(wpe_drawing_area_parent_class)->constructed(object);
-
-  WPEDrawingArea *area = WPE_DRAWING_AREA(object);
-  wpe_view_scale_changed(area->view, gtk_widget_get_scale_factor(GTK_WIDGET(area)));
-  g_signal_connect(area, "notify::scale-factor", G_CALLBACK(wpe_drawing_area_scale_changed), NULL);
 }
 
 static void wpe_drawing_area_set_property(GObject *object, guint prop_id, const GValue *value, GParamSpec *pspec)
@@ -280,24 +149,55 @@ static void wpe_drawing_area_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
     wpe_view_buffer_rendered(area->view, area->committed_buffer);
 }
 
+static WPEToplevel *get_or_create_toplevel_for_window(WPEDisplayGtk *display, GtkWindow *window)
+{
+  WPEToplevel *toplevel = g_object_get_data(G_OBJECT(window), "wpe-toplevel");
+  if (!toplevel) {
+    toplevel = wpe_toplevel_gtk_new(display, window);
+    g_object_set_data_full(G_OBJECT(window), "wpe-toplevel", toplevel, g_object_unref);
+  }
+  return toplevel;
+}
+
 static void wpe_drawing_area_root(GtkWidget *widget)
 {
+  WPEDrawingArea *area = WPE_DRAWING_AREA(widget);
+
   GTK_WIDGET_CLASS(wpe_drawing_area_parent_class)->root(widget);
 
-  wpe_drawing_area_set_toplevel(WPE_DRAWING_AREA(widget), GTK_WINDOW(gtk_widget_get_root(widget)));
+  GtkWindow *window = GTK_WINDOW(gtk_widget_get_root(widget));
+  WPEToplevel *toplevel = get_or_create_toplevel_for_window(WPE_DISPLAY_GTK(wpe_view_get_display(area->view)), window);
+  wpe_view_set_toplevel(area->view, toplevel);
 }
 
 static void wpe_drawing_area_unroot(GtkWidget *widget)
 {
+  WPEDrawingArea *area = WPE_DRAWING_AREA(widget);
+
   GTK_WIDGET_CLASS(wpe_drawing_area_parent_class)->unroot(widget);
 
-  wpe_drawing_area_set_toplevel(WPE_DRAWING_AREA(widget), NULL);
+  wpe_view_set_toplevel(area->view, NULL);
+}
+
+static void wpe_drawing_area_map(GtkWidget *widget)
+{
+  GTK_WIDGET_CLASS(wpe_drawing_area_parent_class)->map(widget);
+
+  WPEDrawingArea *area = WPE_DRAWING_AREA(widget);
+  wpe_view_map(area->view);
+}
+
+static void wpe_drawing_area_unmap(GtkWidget *widget)
+{
+  GTK_WIDGET_CLASS(wpe_drawing_area_parent_class)->unmap(widget);
+
+  WPEDrawingArea *area = WPE_DRAWING_AREA(widget);
+  wpe_view_unmap(area->view);
 }
 
 static void wpe_drawing_area_class_init(WPEDrawingAreaClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS(klass);
-  object_class->constructed = wpe_drawing_area_constructed;
   object_class->set_property = wpe_drawing_area_set_property;
   object_class->dispose = wpe_drawing_area_dispose;
 
@@ -314,6 +214,8 @@ static void wpe_drawing_area_class_init(WPEDrawingAreaClass *klass)
   widget_class->snapshot = wpe_drawing_area_snapshot;
   widget_class->root = wpe_drawing_area_root;
   widget_class->unroot = wpe_drawing_area_unroot;
+  widget_class->map = wpe_drawing_area_map;
+  widget_class->unmap = wpe_drawing_area_unmap;
 }
 
 static WPEModifiers wpe_modifiers_for_gdk_modifiers(GdkModifierType modifiers)
@@ -586,17 +488,25 @@ GtkWidget *wpe_drawing_area_new(WPEView *view)
   return g_object_new(WPE_TYPE_DRAWING_AREA, "view", view, NULL);
 }
 
-GtkWindow *wpe_drawing_area_get_toplevel(WPEDrawingArea *area)
+static void wpe_drawing_area_update_buffer_damage(WPEDrawingArea *area, WPEBufferGtk *buffer_gtk, const WPERectangle *damage_rects, guint n_damage_rects)
 {
-  return area->toplevel;
+  if (n_damage_rects > 0 && area->committed_buffer) {
+    WPEBufferGtk *committed_buffer_gtk = wpe_buffer_get_user_data(area->committed_buffer);
+    gdk_dmabuf_texture_builder_set_update_texture(buffer_gtk->builder, committed_buffer_gtk->texture);
+    cairo_region_t *region = cairo_region_create();
+    for (guint i = 0; i < n_damage_rects; i++) {
+      cairo_rectangle_int_t rect = { damage_rects[i].x, damage_rects[i].y, damage_rects[i].width, damage_rects[i].height };
+      cairo_region_union_rectangle(region, &rect);
+    }
+    gdk_dmabuf_texture_builder_set_update_region(buffer_gtk->builder, region);
+    cairo_region_destroy(region);
+  } else {
+    gdk_dmabuf_texture_builder_set_update_texture(buffer_gtk->builder, NULL);
+    gdk_dmabuf_texture_builder_set_update_region(buffer_gtk->builder, NULL);
+  }
 }
 
-GdkMonitor *wpe_drawing_area_get_current_monitor(WPEDrawingArea *area)
-{
-  return area->current_monitor;
-}
-
-static gboolean wpe_drawing_area_ensure_texture(WPEDrawingArea *area, WPEBuffer *buffer, GError **error)
+static gboolean wpe_drawing_area_ensure_texture(WPEDrawingArea *area, WPEBuffer *buffer, const WPERectangle *damage_rects, guint n_damage_rects, GError **error)
 {
   WPEBufferGtk* buffer_gtk = wpe_buffer_get_user_data(buffer);
   if (!buffer_gtk) {
@@ -608,14 +518,30 @@ static gboolean wpe_drawing_area_ensure_texture(WPEDrawingArea *area, WPEBuffer 
     wpe_buffer_set_user_data(buffer, buffer_gtk, (GDestroyNotify)wpe_buffer_gtk_free);
   }
 
-  return wpe_buffer_gtk_update(buffer_gtk, buffer, error);
+  if (buffer_gtk->builder) {
+    wpe_drawing_area_update_buffer_damage(area, buffer_gtk, damage_rects, n_damage_rects);
+    g_autoptr(GError) buffer_error = NULL;
+    g_set_object(&buffer_gtk->texture, gdk_dmabuf_texture_builder_build(buffer_gtk->builder, NULL, NULL, &buffer_error));
+    if (!buffer_gtk->texture) {
+      g_set_error(error, WPE_VIEW_ERROR, WPE_VIEW_ERROR_RENDER_FAILED, "Failed to render buffer: failed to build DMA-BUF texture: %s", buffer_error->message);
+      return FALSE;
+    }
+  } else {
+    g_set_object(&buffer_gtk->texture, gdk_memory_texture_new(wpe_buffer_get_width(buffer),
+                                                              wpe_buffer_get_height(buffer),
+                                                              GDK_MEMORY_DEFAULT,
+                                                              wpe_buffer_shm_get_data(WPE_BUFFER_SHM(buffer)),
+                                                              wpe_buffer_shm_get_stride(WPE_BUFFER_SHM(buffer))));
+  }
+
+  return TRUE;
 }
 
-gboolean wpe_drawing_area_render_buffer(WPEDrawingArea *area, WPEBuffer *buffer, GError **error)
+gboolean wpe_drawing_area_render_buffer(WPEDrawingArea *area, WPEBuffer *buffer, const WPERectangle *damage_rects, guint n_damage_rects, GError **error)
 {
   g_return_val_if_fail(WPE_IS_DRAWING_AREA(area), FALSE);
 
-  if (!wpe_drawing_area_ensure_texture(area, buffer, error))
+  if (!wpe_drawing_area_ensure_texture(area, buffer, damage_rects, n_damage_rects, error))
     return FALSE;
 
   g_set_object(&area->pending_buffer, buffer);

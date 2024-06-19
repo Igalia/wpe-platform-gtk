@@ -24,6 +24,7 @@
 
 #include "wpe-drawing-area.h"
 #include "wpe-monitor-gtk.h"
+#include "wpe-toplevel-gtk.h"
 
 struct _WPEViewGtk {
   WPEView parent;
@@ -32,6 +33,22 @@ struct _WPEViewGtk {
 };
 
 G_DEFINE_FINAL_TYPE(WPEViewGtk, wpe_view_gtk, WPE_TYPE_VIEW)
+
+static void wpe_view_gtk_monitor_changed(WPEView *view, GParamSpec *pspec, gpointer user_data)
+{
+  if (wpe_view_get_monitor(view))
+    wpe_view_map(view);
+  else
+    wpe_view_unmap(view);
+}
+
+static void wpe_view_gtk_constructed(GObject *object)
+{
+  G_OBJECT_CLASS(wpe_view_gtk_parent_class)->constructed(object);
+
+  WPEViewGtk *view_gtk = WPE_VIEW_GTK(object);
+  g_signal_connect(view_gtk, "notify::monitor", G_CALLBACK(wpe_view_gtk_monitor_changed), NULL);
+}
 
 static void wpe_view_gtk_finalize(GObject *object)
 {
@@ -42,7 +59,7 @@ static void wpe_view_gtk_finalize(GObject *object)
   G_OBJECT_CLASS(wpe_view_gtk_parent_class)->finalize(object);
 }
 
-static gboolean wpe_view_gtk_render_buffer(WPEView *view, WPEBuffer *buffer, GError **error)
+static gboolean wpe_view_gtk_render_buffer(WPEView *view, WPEBuffer *buffer, const WPERectangle *damage_rects, guint n_damage_rects, GError **error)
 {
   WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
   if (!view_gtk->drawing_area) {
@@ -50,7 +67,7 @@ static gboolean wpe_view_gtk_render_buffer(WPEView *view, WPEBuffer *buffer, GEr
     return FALSE;
   }
 
-  return wpe_drawing_area_render_buffer(view_gtk->drawing_area, buffer, error);
+  return wpe_drawing_area_render_buffer(view_gtk->drawing_area, buffer, damage_rects, n_damage_rects, error);
 }
 
 static void wpe_view_gtk_set_cursor_from_name(WPEView *view, const char *name)
@@ -71,57 +88,6 @@ static void wpe_view_gtk_set_cursor_from_bytes(WPEView *view, GBytes *bytes, gui
   g_autoptr(GdkTexture) texture = gdk_memory_texture_new(width, height, GDK_MEMORY_DEFAULT, bytes, stride);
   g_autoptr(GdkCursor) cursor = gdk_cursor_new_from_texture(texture, hotspot_x, hotspot_y, NULL);
   gtk_widget_set_cursor(GTK_WIDGET(view_gtk->drawing_area), cursor);
-}
-
-static WPEMonitor *wpe_view_gtk_get_monitor(WPEView *view)
-{
-  WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
-  if (!view_gtk->drawing_area)
-    return NULL;
-
-  GdkMonitor *monitor = wpe_drawing_area_get_current_monitor(view_gtk->drawing_area);
-  if (!monitor)
-    return NULL;
-
-  WPEDisplay *display = wpe_view_get_display(view);
-  guint n_monitors = wpe_display_get_n_monitors(display);
-  for (guint i = 0; i < n_monitors; i++) {
-    WPEMonitor *wpe_monitor = wpe_display_get_monitor(display, i);
-    if (wpe_monitor_gtk_get_gdk_monitor(WPE_MONITOR_GTK(wpe_monitor)) == monitor)
-      return wpe_monitor;
-  }
-
-  return NULL;
-}
-
-static gboolean wpe_view_gtk_set_fullscreen(WPEView *view, gboolean fullscreen)
-{
-  WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
-  if (!view_gtk->drawing_area)
-    return FALSE;
-
-  GtkWindow *toplevel = wpe_drawing_area_get_toplevel(view_gtk->drawing_area);
-  if (fullscreen)
-    gtk_window_fullscreen(toplevel);
-  else
-    gtk_window_unfullscreen(toplevel);
-
-  return TRUE;
-}
-
-static gboolean wpe_view_gtk_set_maximized(WPEView *view, gboolean maximized)
-{
-  WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
-  if (!view_gtk->drawing_area)
-    return FALSE;
-
-  GtkWindow *toplevel = wpe_drawing_area_get_toplevel(view_gtk->drawing_area);
-  if (maximized)
-    gtk_window_maximize(toplevel);
-  else
-    gtk_window_unmaximize(toplevel);
-
-  return TRUE;
 }
 
 static void wpe_view_gtk_set_opaque_rectangles(WPEView *view, WPERectangle *rects, guint n_rects)
@@ -148,19 +114,28 @@ static void wpe_view_gtk_set_opaque_rectangles(WPEView *view, WPERectangle *rect
     cairo_region_destroy(region);
 }
 
+static gboolean wpe_view_gtk_can_be_mapped(WPEView *view)
+{
+  WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
+  if (!view_gtk->drawing_area || !gtk_widget_get_mapped(GTK_WIDGET(view_gtk->drawing_area)))
+    return FALSE;
+
+  WPEToplevel *toplevel = wpe_view_get_toplevel(view);
+  return toplevel ? wpe_toplevel_gtk_is_in_monitor(WPE_TOPLEVEL_GTK(toplevel)) : FALSE;
+}
+
 static void wpe_view_gtk_class_init(WPEViewGtkClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS(klass);
+  object_class->constructed = wpe_view_gtk_constructed;
   object_class->finalize = wpe_view_gtk_finalize;
 
   WPEViewClass *view_class = WPE_VIEW_CLASS(klass);
   view_class->render_buffer = wpe_view_gtk_render_buffer;
   view_class->set_cursor_from_name = wpe_view_gtk_set_cursor_from_name;
   view_class->set_cursor_from_bytes = wpe_view_gtk_set_cursor_from_bytes;
-  view_class->get_monitor = wpe_view_gtk_get_monitor;
-  view_class->set_fullscreen = wpe_view_gtk_set_fullscreen;
-  view_class->set_maximized = wpe_view_gtk_set_maximized;
   view_class->set_opaque_rectangles = wpe_view_gtk_set_opaque_rectangles;
+  view_class->can_be_mapped = wpe_view_gtk_can_be_mapped;
 }
 
 static void wpe_view_gtk_init(WPEViewGtk *view_gtk)

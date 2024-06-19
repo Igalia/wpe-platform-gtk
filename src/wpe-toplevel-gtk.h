@@ -20,21 +20,22 @@
  * SOFTWARE.
  */
 
-#pragma once
+#ifndef _WPE_TOPLEVEL_GTK_H_
+#define _WPE_TOPLEVEL_GTK_H_
 
+#include "wpe-display-gtk.h"
 #include <gtk/gtk.h>
-#include <wpe/wpe-platform.h>
 
 G_BEGIN_DECLS
 
-#define WPE_TYPE_DRAWING_AREA (wpe_drawing_area_get_type())
-G_DECLARE_FINAL_TYPE(WPEDrawingArea, wpe_drawing_area, WPE, DRAWING_AREA, GtkWidget)
+#define WPE_TYPE_TOPLEVEL_GTK (wpe_toplevel_gtk_get_type())
+G_DECLARE_FINAL_TYPE(WPEToplevelGtk, wpe_toplevel_gtk, WPE, TOPLEVEL_GTK, WPEToplevel)
 
-GtkWidget *wpe_drawing_area_new           (WPEView            *view);
-gboolean   wpe_drawing_area_render_buffer (WPEDrawingArea     *area,
-                                           WPEBuffer          *buffer,
-                                           const WPERectangle *damage_rects,
-                                           guint               n_damage_rects,
-                                           GError            **error);
+WPEToplevel *wpe_toplevel_gtk_new           (WPEDisplayGtk  *display,
+                                             GtkWindow      *window);
+GtkWindow   *wpe_toplevel_gtk_get_window    (WPEToplevelGtk *toplevel);
+gboolean     wpe_toplevel_gtk_is_in_monitor (WPEToplevelGtk *toplevel);
 
 G_END_DECLS
+
+#endif /* _WPE_TOPLEVEL_GTK_H_ */

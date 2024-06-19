@@ -4,6 +4,7 @@ sources = files(
   'wpe-keymap-gtk.c',
   'wpe-monitor-gtk.c',
   'wpe-platform-gtk-module.c',
+  'wpe-toplevel-gtk.c',
   'wpe-view-gtk.c'
 )
 
