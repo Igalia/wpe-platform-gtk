@@ -35,12 +35,19 @@ enum {
 
 static GParamSpec *properties[N_PROPS];
 
+typedef struct {
+  double x;
+  double y;
+} MotionEvent;
+
 struct _WPEDrawingArea {
   GtkWidget parent;
 
   WPEView *view;
   WPEBuffer *pending_buffer;
   WPEBuffer *committed_buffer;
+
+  MotionEvent last_motion_event;
 };
 
 G_DEFINE_FINAL_TYPE(WPEDrawingArea, wpe_drawing_area, GTK_TYPE_WIDGET)
@@ -303,14 +310,21 @@ static void wpe_drawing_area_pointer_enter(WPEDrawingArea *area, double x, doubl
 static gboolean wpe_drawing_area_pointer_motion(WPEDrawingArea *area, double x, double y, GtkEventController *controller)
 {
   GdkEvent *gdk_event = gtk_event_controller_get_current_event(controller);
-  /* FIXME: get delta */
+  double delta_x = 0, delta_y = 0;
+  if (area->last_motion_event.x != -1 && area->last_motion_event.y != -1) {
+    delta_x = x - area->last_motion_event.x;
+    delta_y = y - area->last_motion_event.y;
+  }
+  area->last_motion_event.x = x;
+  area->last_motion_event.y = y;
+
   g_autoptr(WPEEvent) event =
     wpe_event_pointer_move_new(WPE_EVENT_POINTER_MOVE,
                                area->view,
                                wpe_input_source_for_gdk_device(gdk_event_get_device(gdk_event)),
                                gdk_event_get_time(gdk_event),
                                wpe_modifiers_for_gdk_modifiers(gdk_event_get_modifier_state(gdk_event)),
-                               x, y, 0, 0);
+                               x, y, delta_x, delta_y);
   wpe_view_event(area->view, event);
 
   return GDK_EVENT_PROPAGATE;
@@ -322,7 +336,7 @@ static void wpe_drawing_area_pointer_leave(WPEDrawingArea *area, GdkCrossingMode
     wpe_event_pointer_move_new(WPE_EVENT_POINTER_LEAVE,
                                area->view,
                                WPE_INPUT_SOURCE_MOUSE,
-                               0, 0, 0, 0, 0, 0);
+                               0, 0, -1, -1, 0, 0);
   wpe_view_event(area->view, event);
 }
 
@@ -337,7 +351,8 @@ static void wpe_drawing_area_scroll_begin(WPEDrawingArea *area, GtkEventControll
                          0, 0,
                          gdk_event_get_event_type(gdk_event) != GDK_SCROLL || gdk_scroll_event_get_unit(gdk_event) != GDK_SCROLL_UNIT_WHEEL,
                          FALSE,
-                         0, 0); // FIXME
+                         area->last_motion_event.x != -1 ? area->last_motion_event.x : 0,
+                         area->last_motion_event.y != -1 ? area->last_motion_event.y : 0);
   wpe_view_event(area->view, event);
 }
 
@@ -352,7 +367,8 @@ static gboolean wpe_drawing_area_scroll(WPEDrawingArea *area, double x, double y
                          -x, -y,
                          gdk_event_get_event_type(gdk_event) != GDK_SCROLL || gdk_scroll_event_get_unit(gdk_event) != GDK_SCROLL_UNIT_WHEEL,
                          FALSE,
-                         0, 0); // FIXME
+                         area->last_motion_event.x != -1 ? area->last_motion_event.x : 0,
+                         area->last_motion_event.y != -1 ? area->last_motion_event.y : 0);
   wpe_view_event(area->view, event);
   return GDK_EVENT_STOP;
 }
@@ -371,7 +387,8 @@ static void wpe_drawing_area_scroll_end(WPEDrawingArea *area, GtkEventController
                          0, 0,
                          gdk_event_get_event_type(gdk_event) != GDK_SCROLL || gdk_scroll_event_get_unit(gdk_event) != GDK_SCROLL_UNIT_WHEEL,
                          TRUE,
-                         0, 0); // FIXME
+                         area->last_motion_event.x != -1 ? area->last_motion_event.x : 0,
+                         area->last_motion_event.y != -1 ? area->last_motion_event.y : 0);
   wpe_view_event(area->view, event);
 }
 
@@ -450,6 +467,9 @@ static void wpe_drawing_area_init(WPEDrawingArea *area)
   GtkWidget *widget = GTK_WIDGET(area);
   gtk_widget_set_focusable(widget, TRUE);
   gtk_widget_set_can_focus(widget, TRUE);
+
+  area->last_motion_event.x = -1;
+  area->last_motion_event.y = -1;
 
   GtkEventController *controller = gtk_event_controller_focus_new();
   g_signal_connect_object(controller, "enter", G_CALLBACK(wpe_drawing_area_focus_enter), widget, G_CONNECT_SWAPPED);
