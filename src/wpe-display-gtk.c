@@ -22,7 +22,7 @@
 
 #include "wpe-display-gtk.h"
 
-#include "wpe-monitor-gtk-private.h"
+#include "wpe-screen-gtk-private.h"
 #include "wpe-view-gtk.h"
 #include <epoxy/egl.h>
 
@@ -45,7 +45,7 @@ struct _WPEDisplayGtk {
   EGLDisplay egl_display;
   char *drm_device;
   char *drm_render_node;
-  GPtrArray *monitors;
+  GPtrArray *screens;
 };
 
 G_DEFINE_DYNAMIC_TYPE_EXTENDED(WPEDisplayGtk, wpe_display_gtk, WPE_TYPE_DISPLAY, G_TYPE_FLAG_FINAL, {})
@@ -55,7 +55,7 @@ static void wpe_display_gtk_finalize(GObject *object)
   WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(object);
   g_clear_pointer(&display_gtk->drm_device, g_free);
   g_clear_pointer(&display_gtk->drm_render_node, g_free);
-  g_clear_pointer(&display_gtk->monitors, g_ptr_array_unref);
+  g_clear_pointer(&display_gtk->screens, g_ptr_array_unref);
 
   G_OBJECT_CLASS(wpe_display_gtk_parent_class)->finalize(object);
 }
@@ -63,23 +63,23 @@ static void wpe_display_gtk_finalize(GObject *object)
 static void wpe_display_gtk_monitors_changed(WPEDisplayGtk *display_gtk, guint index, guint n_removed, guint n_added, GListModel *monitors)
 {
   for (guint i = 0; i < n_removed; i++)
-    g_ptr_array_remove_index(display_gtk->monitors, index);
+    g_ptr_array_remove_index(display_gtk->screens, index);
 
   for (guint i = 0; i < n_added; i++) {
     GdkMonitor *monitor = GDK_MONITOR(g_list_model_get_item(monitors, index + i));
-    g_ptr_array_add(display_gtk->monitors, wpe_monitor_gtk_create(monitor));
+    g_ptr_array_add(display_gtk->screens, wpe_screen_gtk_create(monitor));
     g_object_unref(monitor);
   }
 }
 
-static void wpe_display_gtk_setup_monitors(WPEDisplayGtk *display_gtk)
+static void wpe_display_gtk_setup_screens(WPEDisplayGtk *display_gtk)
 {
   GListModel *monitors = gdk_display_get_monitors(display_gtk->display);
   guint n_monitors = g_list_model_get_n_items(monitors);
-  display_gtk->monitors = g_ptr_array_new_full(n_monitors, g_object_unref);
+  display_gtk->screens = g_ptr_array_new_full(n_monitors, g_object_unref);
   for (guint i = 0; i < n_monitors; i++) {
     GdkMonitor *monitor = GDK_MONITOR(g_list_model_get_item(monitors, i));
-    g_ptr_array_add(display_gtk->monitors, wpe_monitor_gtk_create(monitor));
+    g_ptr_array_add(display_gtk->screens, wpe_screen_gtk_create(monitor));
     g_object_unref(monitor);
   }
   g_signal_connect_object(monitors, "items-changed", G_CALLBACK(wpe_display_gtk_monitors_changed), display_gtk, G_CONNECT_SWAPPED);
@@ -124,7 +124,7 @@ static gboolean wpe_display_gtk_connect(WPEDisplay *display, GError **error)
       display_gtk->drm_render_node = g_strdup(eglQueryDeviceStringEXT(egl_device, EGL_DRM_RENDER_NODE_FILE_EXT));
   }
 
-  wpe_display_gtk_setup_monitors(display_gtk);
+  wpe_display_gtk_setup_screens(display_gtk);
 
   return TRUE;
 }
@@ -183,22 +183,19 @@ const char *wpe_display_gtk_get_drm_render_node(WPEDisplay *display)
   return WPE_DISPLAY_GTK(display)->drm_render_node;
 }
 
-static guint wpe_display_gtk_get_n_monitors(WPEDisplay *display)
+static guint wpe_display_gtk_get_n_screens(WPEDisplay *display)
 {
   WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
-  if (!display_gtk->monitors)
-    return 0;
-
-  return display_gtk->monitors->len;
+  return display_gtk->screens ? display_gtk->screens->len : 0;
 }
 
-static WPEMonitor *wpe_display_gtk_get_monitor(WPEDisplay *display, guint index)
+static WPEScreen *wpe_display_gtk_get_screen(WPEDisplay *display, guint index)
 {
   WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
-  if (!display_gtk->monitors)
+  if (!display_gtk->screens)
     return NULL;
 
-  return index < display_gtk->monitors->len ? g_ptr_array_index(display_gtk->monitors, index) : NULL;
+  return index < display_gtk->screens->len ? g_ptr_array_index(display_gtk->screens, index) : NULL;
 }
 
 
@@ -214,8 +211,8 @@ static void wpe_display_gtk_class_init(WPEDisplayGtkClass *klass)
   display_class->get_preferred_dma_buf_formats = wpe_display_gtk_get_preferred_dma_buf_formats;
   display_class->get_drm_device = wpe_display_gtk_get_drm_device;
   display_class->get_drm_render_node = wpe_display_gtk_get_drm_render_node;
-  display_class->get_n_monitors = wpe_display_gtk_get_n_monitors;
-  display_class->get_monitor = wpe_display_gtk_get_monitor;
+  display_class->get_n_screens = wpe_display_gtk_get_n_screens;
+  display_class->get_screen = wpe_display_gtk_get_screen;
 }
 
 static void wpe_display_gtk_class_finalize(WPEDisplayGtkClass *klass)

@@ -20,19 +20,8 @@
  * SOFTWARE.
  */
 
-#ifndef _WPE_MONITOR_GTK_H_
-#define _WPE_MONITOR_GTK_H_
+#pragma once
 
-#include <gtk/gtk.h>
-#include <wpe/wpe-platform.h>
+#include "wpe-screen-gtk.h"
 
-G_BEGIN_DECLS
-
-#define WPE_TYPE_MONITOR_GTK (wpe_monitor_gtk_get_type())
-G_DECLARE_FINAL_TYPE(WPEMonitorGtk, wpe_monitor_gtk, WPE, MONITOR_GTK, WPEMonitor)
-
-GdkMonitor *wpe_monitor_gtk_get_gdk_monitor (WPEMonitorGtk *monitor);
-
-G_END_DECLS
-
-#endif /* _WPE_MONITOR_GTK_H_ */
+WPEScreen *wpe_screen_gtk_create(GdkMonitor *monitor);

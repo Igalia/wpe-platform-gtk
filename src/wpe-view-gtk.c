@@ -23,7 +23,7 @@
 #include "wpe-view-gtk.h"
 
 #include "wpe-drawing-area.h"
-#include "wpe-monitor-gtk.h"
+#include "wpe-screen-gtk.h"
 #include "wpe-toplevel-gtk.h"
 
 struct _WPEViewGtk {
@@ -36,7 +36,7 @@ G_DEFINE_FINAL_TYPE(WPEViewGtk, wpe_view_gtk, WPE_TYPE_VIEW)
 
 static void wpe_view_gtk_monitor_changed(WPEView *view, GParamSpec *pspec, gpointer user_data)
 {
-  if (wpe_view_get_monitor(view))
+  if (wpe_view_get_screen(view))
     wpe_view_map(view);
   else
     wpe_view_unmap(view);
@@ -121,7 +121,7 @@ static gboolean wpe_view_gtk_can_be_mapped(WPEView *view)
     return FALSE;
 
   WPEToplevel *toplevel = wpe_view_get_toplevel(view);
-  return toplevel ? wpe_toplevel_gtk_is_in_monitor(WPE_TOPLEVEL_GTK(toplevel)) : FALSE;
+  return toplevel ? wpe_toplevel_gtk_is_in_screen(WPE_TOPLEVEL_GTK(toplevel)) : FALSE;
 }
 
 static void wpe_view_gtk_class_init(WPEViewGtkClass *klass)

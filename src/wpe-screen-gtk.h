@@ -20,22 +20,19 @@
  * SOFTWARE.
  */
 
-#ifndef _WPE_TOPLEVEL_GTK_H_
-#define _WPE_TOPLEVEL_GTK_H_
+#ifndef _WPE_SCREEN_GTK_H_
+#define _WPE_SCREEN_GTK_H_
 
-#include "wpe-display-gtk.h"
 #include <gtk/gtk.h>
+#include <wpe/wpe-platform.h>
 
 G_BEGIN_DECLS
 
-#define WPE_TYPE_TOPLEVEL_GTK (wpe_toplevel_gtk_get_type())
-G_DECLARE_FINAL_TYPE(WPEToplevelGtk, wpe_toplevel_gtk, WPE, TOPLEVEL_GTK, WPEToplevel)
+#define WPE_TYPE_SCREEN_GTK (wpe_screen_gtk_get_type())
+G_DECLARE_FINAL_TYPE(WPEScreenGtk, wpe_screen_gtk, WPE, SCREEN_GTK, WPEScreen)
 
-WPEToplevel *wpe_toplevel_gtk_new           (WPEDisplayGtk  *display,
-                                             GtkWindow      *window);
-GtkWindow   *wpe_toplevel_gtk_get_window    (WPEToplevelGtk *toplevel);
-gboolean     wpe_toplevel_gtk_is_in_screen  (WPEToplevelGtk *toplevel);
+GdkMonitor *wpe_screen_gtk_get_gdk_monitor (WPEScreenGtk *screen);
 
 G_END_DECLS
 
-#endif /* _WPE_TOPLEVEL_GTK_H_ */
+#endif /* _WPE_SCREEN_GTK_H_ */

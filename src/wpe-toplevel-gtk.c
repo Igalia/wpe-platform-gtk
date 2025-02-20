@@ -23,7 +23,7 @@
 #include "wpe-toplevel-gtk.h"
 
 #include "wpe-drawing-area.h"
-#include "wpe-monitor-gtk.h"
+#include "wpe-screen-gtk.h"
 
 enum {
   PROP_0,
@@ -82,7 +82,7 @@ static void wpe_toplevel_gtk_entered_monitor(GdkSurface *surface, GdkMonitor *mo
   toplevel_gtk->monitors = g_list_append(toplevel_gtk->monitors, monitor);
   if (toplevel_gtk->current_monitor != monitor) {
     toplevel_gtk->current_monitor = monitor;
-    wpe_toplevel_monitor_changed(WPE_TOPLEVEL(toplevel_gtk));
+    wpe_toplevel_screen_changed(WPE_TOPLEVEL(toplevel_gtk));
   }
 }
 
@@ -95,7 +95,7 @@ static void wpe_toplevel_gtk_left_monitor(GdkSurface *surface, GdkMonitor *monit
     current_monitor = gdk_display_get_monitor_at_surface(gtk_widget_get_display(GTK_WIDGET(toplevel_gtk->window)), surface);
   if (toplevel_gtk->current_monitor != current_monitor) {
     toplevel_gtk->current_monitor = current_monitor;
-    wpe_toplevel_monitor_changed(WPE_TOPLEVEL(toplevel_gtk));
+    wpe_toplevel_screen_changed(WPE_TOPLEVEL(toplevel_gtk));
   }
 }
 
@@ -107,7 +107,7 @@ static void wpe_toplevel_gtk_connect_surface_signals(WPEToplevelGtk *toplevel_gt
 
   toplevel_gtk->current_monitor = gdk_display_get_monitor_at_surface(gtk_widget_get_display(GTK_WIDGET(toplevel_gtk->window)), surface);
   if (toplevel_gtk->current_monitor)
-    wpe_toplevel_monitor_changed(WPE_TOPLEVEL(toplevel_gtk));
+    wpe_toplevel_screen_changed(WPE_TOPLEVEL(toplevel_gtk));
   g_signal_connect(surface, "enter-monitor", G_CALLBACK(wpe_toplevel_gtk_entered_monitor), toplevel_gtk);
   g_signal_connect(surface, "leave-monitor", G_CALLBACK(wpe_toplevel_gtk_left_monitor), toplevel_gtk);
 }
@@ -190,7 +190,7 @@ static void wpe_toplevel_gtk_set_title(WPEToplevel *toplevel, const char *title)
     gtk_window_set_title(toplevel_gtk->window, title);
 }
 
-static WPEMonitor *wpe_toplevel_gtk_get_monitor(WPEToplevel *toplevel)
+static WPEScreen *wpe_toplevel_gtk_get_screen(WPEToplevel *toplevel)
 {
   WPEToplevelGtk *toplevel_gtk = WPE_TOPLEVEL_GTK(toplevel);
   if (!toplevel_gtk->window)
@@ -200,11 +200,11 @@ static WPEMonitor *wpe_toplevel_gtk_get_monitor(WPEToplevel *toplevel)
     return NULL;
 
   WPEDisplay *display = wpe_toplevel_get_display(toplevel);
-  guint n_monitors = wpe_display_get_n_monitors(display);
-  for (guint i = 0; i < n_monitors; i++) {
-    WPEMonitor *wpe_monitor = wpe_display_get_monitor(display, i);
-    if (wpe_monitor_gtk_get_gdk_monitor(WPE_MONITOR_GTK(wpe_monitor)) == toplevel_gtk->current_monitor)
-      return wpe_monitor;
+  guint n_screens = wpe_display_get_n_screens(display);
+  for (guint i = 0; i < n_screens; i++) {
+    WPEScreen *screen = wpe_display_get_screen(display, i);
+    if (wpe_screen_gtk_get_gdk_monitor(WPE_SCREEN_GTK(screen)) == toplevel_gtk->current_monitor)
+      return screen;
   }
 
   return NULL;
@@ -256,7 +256,7 @@ static void wpe_toplevel_gtk_class_init(WPEToplevelGtkClass *klass)
 
   WPEToplevelClass *toplevel_class = WPE_TOPLEVEL_CLASS(klass);
   toplevel_class->set_title = wpe_toplevel_gtk_set_title;
-  toplevel_class->get_monitor = wpe_toplevel_gtk_get_monitor;
+  toplevel_class->get_screen = wpe_toplevel_gtk_get_screen;
   toplevel_class->set_fullscreen = wpe_toplevel_gtk_set_fullscreen;
   toplevel_class->set_maximized = wpe_toplevel_gtk_set_maximized;
 }
@@ -283,7 +283,7 @@ GtkWindow *wpe_toplevel_gtk_get_window(WPEToplevelGtk *toplevel_gtk)
   return toplevel_gtk->window;
 }
 
-gboolean wpe_toplevel_gtk_is_in_monitor(WPEToplevelGtk *toplevel_gtk)
+gboolean wpe_toplevel_gtk_is_in_screen(WPEToplevelGtk *toplevel_gtk)
 {
   g_return_val_if_fail(WPE_IS_TOPLEVEL_GTK(toplevel_gtk), FALSE);
 

@@ -2,8 +2,8 @@ sources = files(
   'wpe-display-gtk.c',
   'wpe-drawing-area.c',
   'wpe-keymap-gtk.c',
-  'wpe-monitor-gtk.c',
   'wpe-platform-gtk-module.c',
+  'wpe-screen-gtk.c',
   'wpe-toplevel-gtk.c',
   'wpe-view-gtk.c'
 )
