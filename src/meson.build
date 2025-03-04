@@ -12,7 +12,7 @@ libwpeplatformgtk_sources = files(
 libwpeplatformgtk = static_library(
   'wpeplatform-gtk',
   sources: libwpeplatformgtk_sources,
-  dependencies: [ wpe_platform_dep, gtk_dep ]
+  dependencies: [ wpe_platform_dep, gtk_dep, epoxy_dep ]
 )
 
 libwpeplatformgtk_dep = declare_dependency(link_with : libwpeplatformgtk,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Igalia S.L.
+ * Copyright (c) 2025 Igalia S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,23 +20,22 @@
  * SOFTWARE.
  */
 
-#ifndef _WPE_DISPLAY_GTK_H_
-#define _WPE_DISPLAY_GTK_H_
+#ifndef _WG_TAB_VIEW_H_
+#define _WG_TAB_VIEW_H_
 
-#include <gio/gio.h>
+#include <adwaita.h>
 #include <gtk/gtk.h>
-#include <wpe/wpe-platform.h>
+#include <wpe/webkit.h>
 
 G_BEGIN_DECLS
 
-#define WPE_TYPE_DISPLAY_GTK (wpe_display_gtk_get_type())
-G_DECLARE_FINAL_TYPE(WPEDisplayGtk, wpe_display_gtk, WPE, DISPLAY_GTK, WPEDisplay)
+#define WG_TYPE_TAB_VIEW (wg_tab_view_get_type())
+G_DECLARE_FINAL_TYPE(WGTabView, wg_tab_view, WG, TAB_VIEW, AdwBin)
 
-void wpe_display_gtk_register(GIOModule *module);
-
-WPEDisplay *wpe_display_gtk_new             (void);
-GdkDisplay *wpe_display_gtk_get_gdk_display (WPEDisplayGtk *display);
+GtkWidget     *wg_tab_view_new          (WebKitWebView *web_view);
+WebKitWebView *wg_tab_view_get_web_view (WGTabView     *tab_view);
+void           wg_tab_view_grab_focus   (WGTabView     *tab_view);
 
 G_END_DECLS
 
-#endif /* _WPE_DISPLAY_GTK_H_ */
+#endif /* _WG_TAB_VIEW_H_ */

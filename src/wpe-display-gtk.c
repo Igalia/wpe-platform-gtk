@@ -364,6 +364,12 @@ static void wpe_display_gtk_init(WPEDisplayGtk *display)
   display->egl_display = EGL_NO_DISPLAY;
 }
 
+WPEDisplay *wpe_display_gtk_new(void)
+{
+  wpe_display_gtk_register(NULL);
+  return WPE_DISPLAY(g_object_new(WPE_TYPE_DISPLAY_GTK, NULL));
+}
+
 GdkDisplay *wpe_display_gtk_get_gdk_display(WPEDisplayGtk *display)
 {
   g_return_val_if_fail(WPE_IS_DISPLAY_GTK(display), NULL);

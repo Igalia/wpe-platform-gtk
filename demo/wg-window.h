@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Igalia S.L.
+ * Copyright (c) 2025 Igalia S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,23 +20,22 @@
  * SOFTWARE.
  */
 
-#ifndef _WPE_DISPLAY_GTK_H_
-#define _WPE_DISPLAY_GTK_H_
+#ifndef _WG_WINDOW_H_
+#define _WG_WINDOW_H_
 
-#include <gio/gio.h>
+#include <adwaita.h>
 #include <gtk/gtk.h>
-#include <wpe/wpe-platform.h>
+#include <wpe/webkit.h>
 
 G_BEGIN_DECLS
 
-#define WPE_TYPE_DISPLAY_GTK (wpe_display_gtk_get_type())
-G_DECLARE_FINAL_TYPE(WPEDisplayGtk, wpe_display_gtk, WPE, DISPLAY_GTK, WPEDisplay)
+#define WG_TYPE_WINDOW (wg_window_get_type())
+G_DECLARE_FINAL_TYPE(WGWindow, wg_window, WG, WINDOW, AdwApplicationWindow)
 
-void wpe_display_gtk_register(GIOModule *module);
-
-WPEDisplay *wpe_display_gtk_new             (void);
-GdkDisplay *wpe_display_gtk_get_gdk_display (WPEDisplayGtk *display);
+GtkWidget *wg_window_new          (void);
+void       wg_window_add_web_view (WGWindow      *win,
+                                   WebKitWebView *web_view);
 
 G_END_DECLS
 
-#endif /* _WPE_DISPLAY_GTK_H_ */
+#endif /* _WG_WINDOW_H_ */
