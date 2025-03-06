@@ -124,6 +124,14 @@ static gboolean wpe_view_gtk_can_be_mapped(WPEView *view)
   return toplevel ? wpe_toplevel_gtk_is_in_screen(WPE_TOPLEVEL_GTK(toplevel)) : FALSE;
 }
 
+#ifdef GTK_ACCESSIBILITY_ATSPI
+static WPEViewAccessible *wpe_view_gtk_get_accessible(WPEView *view)
+{
+  WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
+  return view_gtk->drawing_area ? WPE_VIEW_ACCESSIBLE(view_gtk->drawing_area) : NULL;
+}
+#endif
+
 static void wpe_view_gtk_class_init(WPEViewGtkClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS(klass);
@@ -136,6 +144,9 @@ static void wpe_view_gtk_class_init(WPEViewGtkClass *klass)
   view_class->set_cursor_from_bytes = wpe_view_gtk_set_cursor_from_bytes;
   view_class->set_opaque_rectangles = wpe_view_gtk_set_opaque_rectangles;
   view_class->can_be_mapped = wpe_view_gtk_can_be_mapped;
+#ifdef GTK_ACCESSIBILITY_ATSPI
+  view_class->get_accessible = wpe_view_gtk_get_accessible;
+#endif
 }
 
 static void wpe_view_gtk_init(WPEViewGtk *view_gtk)

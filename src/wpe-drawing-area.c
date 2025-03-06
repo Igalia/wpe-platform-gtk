@@ -25,6 +25,10 @@
 #include "wpe-display-gtk.h"
 #include "wpe-toplevel-gtk.h"
 
+#ifdef GTK_ACCESSIBILITY_ATSPI
+#include <gtk/a11y/gtkatspi.h>
+#endif
+
 enum {
   PROP_0,
 
@@ -48,9 +52,22 @@ struct _WPEDrawingArea {
   WPEBuffer *committed_buffer;
 
   MotionEvent last_motion_event;
+
+#ifdef GTK_ACCESSIBILITY_ATSPI
+  GtkAccessible *accessible;
+#endif
 };
 
+#ifdef GTK_ACCESSIBILITY_ATSPI
+static void wpe_drawing_area_accessible_interface_init(GtkAccessibleInterface *iface);
+static void wpe_drawing_area_view_accessible_interface_init(WPEViewAccessibleInterface* iface);
+
+G_DEFINE_FINAL_TYPE_WITH_CODE(WPEDrawingArea, wpe_drawing_area, GTK_TYPE_WIDGET,
+                              G_IMPLEMENT_INTERFACE(GTK_TYPE_ACCESSIBLE, wpe_drawing_area_accessible_interface_init)
+                              G_IMPLEMENT_INTERFACE(WPE_TYPE_VIEW_ACCESSIBLE, wpe_drawing_area_view_accessible_interface_init))
+#else
 G_DEFINE_FINAL_TYPE(WPEDrawingArea, wpe_drawing_area, GTK_TYPE_WIDGET)
+#endif
 
 typedef struct {
   GdkDmabufTextureBuilder *builder;
@@ -119,6 +136,10 @@ static void wpe_drawing_area_dispose(GObject *object)
   g_clear_object(&area->view);
   g_clear_object(&area->pending_buffer);
   g_clear_object(&area->committed_buffer);
+
+#ifdef GTK_ACCESSIBILITY_ATSPI
+  g_clear_object(&area->accessible);
+#endif
 
   G_OBJECT_CLASS(wpe_drawing_area_parent_class)->dispose(object);
 }
@@ -568,3 +589,60 @@ gboolean wpe_drawing_area_render_buffer(WPEDrawingArea *area, WPEBuffer *buffer,
   gtk_widget_queue_draw(GTK_WIDGET(area));
   return TRUE;
 }
+
+#ifdef GTK_ACCESSIBILITY_ATSPI
+static GtkAccessible *wpe_drawing_area_get_first_accessible_child(GtkAccessible* accessible)
+{
+  WPEDrawingArea *area = WPE_DRAWING_AREA(accessible);
+
+  if (area->accessible)
+    return GTK_ACCESSIBLE(g_object_ref(area->accessible));
+
+  GtkWidget *widget = gtk_widget_get_first_child(GTK_WIDGET(area));
+  if (widget)
+    return GTK_ACCESSIBLE(g_object_ref(widget));
+
+  return NULL;
+}
+
+static void wpe_drawing_area_accessible_interface_init(GtkAccessibleInterface* iface)
+{
+  iface->get_first_accessible_child = wpe_drawing_area_get_first_accessible_child;
+}
+
+static void wpe_drawing_area_bind(WPEViewAccessible *accessible, const char *plugID)
+{
+  WPEDrawingArea *area = WPE_DRAWING_AREA(accessible);
+
+  if (area->accessible) {
+    gtk_accessible_set_accessible_parent(area->accessible, NULL, NULL);
+    g_clear_object(&area->accessible);
+  }
+
+  GError *error = NULL;
+  char **tokens = g_strsplit(plugID, ":", 2);
+  if (!g_dbus_is_unique_name(tokens[0])) {
+    area->accessible = gtk_at_spi_socket_new(tokens[0], tokens[1], &error);
+  } else {
+    char *bus_name = g_strdup_printf(":%s", tokens[0]);
+
+    area->accessible = gtk_at_spi_socket_new(bus_name, tokens[1], &error);
+    g_free(bus_name);
+  }
+  g_strfreev(tokens);
+
+  if (!area->accessible) {
+    g_warning("Error creating WPEViewGtk accessibility socket: %s", error->message);
+    g_error_free(error);
+    return;
+  }
+
+  GtkWidget *child = gtk_widget_get_first_child(GTK_WIDGET(area));
+  gtk_accessible_set_accessible_parent(area->accessible, GTK_ACCESSIBLE(area), GTK_ACCESSIBLE(child));
+}
+
+static void wpe_drawing_area_view_accessible_interface_init(WPEViewAccessibleInterface* iface)
+{
+  iface->bind = wpe_drawing_area_bind;
+}
+#endif /* GTK_ACCESSIBILITY_ATSPI */
