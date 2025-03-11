@@ -22,6 +22,7 @@
 
 #include "wpe-display-gtk.h"
 
+#include "wpe-keymap-gtk.h"
 #include "wpe-screen-gtk-private.h"
 #include "wpe-view-gtk.h"
 #include <epoxy/egl.h>
@@ -45,6 +46,7 @@ struct _WPEDisplayGtk {
   EGLDisplay egl_display;
   char *drm_device;
   char *drm_render_node;
+  WPEKeymap *keymap;
   GPtrArray *screens;
 
   GSettings *desktop_settings;
@@ -58,6 +60,7 @@ static void wpe_display_gtk_finalize(GObject *object)
   g_clear_pointer(&display_gtk->drm_device, g_free);
   g_clear_pointer(&display_gtk->drm_render_node, g_free);
   g_clear_pointer(&display_gtk->screens, g_ptr_array_unref);
+  g_clear_object(&display_gtk->keymap);
   g_clear_object(&display_gtk->desktop_settings);
 
   G_OBJECT_CLASS(wpe_display_gtk_parent_class)->finalize(object);
@@ -261,6 +264,18 @@ static WPEView *wpe_display_gtk_create_view(WPEDisplay *display)
   return WPE_VIEW(view);
 }
 
+static WPEKeymap *wpe_display_gtk_get_keymap(WPEDisplay *display, GError **error)
+{
+  WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
+  if (!display_gtk->display)
+    return NULL;
+
+  if (!display_gtk->keymap)
+    display_gtk->keymap = wpe_keymap_gtk_new(display_gtk->display);
+
+  return display_gtk->keymap;
+}
+
 static WPEBufferDMABufFormats *wpe_display_gtk_get_preferred_dma_buf_formats(WPEDisplay *display)
 {
   WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
@@ -319,6 +334,7 @@ static void wpe_display_gtk_class_init(WPEDisplayGtkClass *klass)
   display_class->connect = wpe_display_gtk_connect;
   display_class->get_egl_display = wpe_display_gtk_get_egl_display;
   display_class->create_view = wpe_display_gtk_create_view;
+  display_class->get_keymap = wpe_display_gtk_get_keymap;
   display_class->get_preferred_dma_buf_formats = wpe_display_gtk_get_preferred_dma_buf_formats;
   display_class->get_drm_device = wpe_display_gtk_get_drm_device;
   display_class->get_drm_render_node = wpe_display_gtk_get_drm_render_node;

@@ -127,7 +127,7 @@ static void wpe_keymap_gtk_init(WPEKeymapGtk *keymap_gtk)
 {
 }
 
-WPEKeymap *wpe_keymap_gtk_create(GdkDisplay *display)
+WPEKeymap *wpe_keymap_gtk_new(GdkDisplay *display)
 {
   g_return_val_if_fail(GDK_IS_DISPLAY(display), NULL);
 
