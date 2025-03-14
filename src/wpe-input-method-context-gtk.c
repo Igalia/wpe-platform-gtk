@@ -38,11 +38,8 @@ G_DEFINE_FINAL_TYPE(WPEInputMethodContextGtk, wpe_input_method_context_gtk, WPE_
 
 static void input_purpose_changed_cb(WPEInputMethodContextGtk *context_gtk)
 {
-  WPEInputPurpose purpose;
-  g_object_get(context_gtk, "input-purpose", &purpose, NULL);
-
   GtkInputPurpose gtk_purpose;
-  switch (purpose) {
+  switch (wpe_input_method_context_get_input_purpose(WPE_INPUT_METHOD_CONTEXT(context_gtk))) {
   case WPE_INPUT_PURPOSE_FREE_FORM:
     gtk_purpose = GTK_INPUT_PURPOSE_FREE_FORM;
     break;
@@ -83,9 +80,7 @@ static void input_purpose_changed_cb(WPEInputMethodContextGtk *context_gtk)
 
 static void input_hints_changed_cb(WPEInputMethodContextGtk *context_gtk)
 {
-  WPEInputHints hints;
-  g_object_get(context_gtk, "input-hints", &hints, NULL);
-
+  WPEInputHints hints = wpe_input_method_context_get_input_hints(WPE_INPUT_METHOD_CONTEXT(context_gtk));
   GtkInputHints gtk_hints = GTK_INPUT_HINT_NONE;
   if (hints & WPE_INPUT_HINT_SPELLCHECK)
     gtk_hints |= GTK_INPUT_HINT_SPELLCHECK;
