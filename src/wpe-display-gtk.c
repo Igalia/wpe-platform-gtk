@@ -22,6 +22,7 @@
 
 #include "wpe-display-gtk.h"
 
+#include "wpe-input-method-context-gtk.h"
 #include "wpe-keymap-gtk.h"
 #include "wpe-screen-gtk-private.h"
 #include "wpe-view-gtk.h"
@@ -324,6 +325,14 @@ static WPEScreen *wpe_display_gtk_get_screen(WPEDisplay *display, guint index)
   return index < display_gtk->screens->len ? g_ptr_array_index(display_gtk->screens, index) : NULL;
 }
 
+static WPEInputMethodContext *wpe_display_gtk_create_input_method_context(WPEDisplay *display, WPEView *view)
+{
+  WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
+  if (!display_gtk->display)
+    return NULL;
+
+  return wpe_input_method_context_gtk_new(view);
+}
 
 static void wpe_display_gtk_class_init(WPEDisplayGtkClass *klass)
 {
@@ -340,6 +349,7 @@ static void wpe_display_gtk_class_init(WPEDisplayGtkClass *klass)
   display_class->get_drm_render_node = wpe_display_gtk_get_drm_render_node;
   display_class->get_n_screens = wpe_display_gtk_get_n_screens;
   display_class->get_screen = wpe_display_gtk_get_screen;
+  display_class->create_input_method_context = wpe_display_gtk_create_input_method_context;
 }
 
 static void wpe_display_gtk_class_finalize(WPEDisplayGtkClass *klass)

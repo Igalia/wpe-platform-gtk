@@ -465,6 +465,7 @@ static gboolean wpe_drawing_area_key_pressed(WPEDrawingArea *area, guint keyval,
                            gdk_event_get_time(gdk_event),
                            wpe_modifiers_for_gdk_modifiers(gdk_event_get_modifier_state(gdk_event)),
                            keycode, keyval);
+  wpe_event_set_user_data(event, gdk_event_ref(gdk_event), (GDestroyNotify)gdk_event_unref);
   wpe_view_event(area->view, event);
   return GDK_EVENT_STOP;
 }
@@ -479,6 +480,7 @@ static gboolean wpe_drawing_area_key_released(WPEDrawingArea *area, guint keyval
                            gdk_event_get_time(gdk_event),
                            wpe_modifiers_for_gdk_modifiers(gdk_event_get_modifier_state(gdk_event)),
                            keycode, keyval);
+  wpe_event_set_user_data(event, gdk_event_ref(gdk_event), (GDestroyNotify)gdk_event_unref);
   wpe_view_event(area->view, event);
   return GDK_EVENT_STOP;
 }
