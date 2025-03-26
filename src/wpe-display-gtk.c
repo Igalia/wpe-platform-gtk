@@ -258,11 +258,13 @@ static WPEView *wpe_display_gtk_create_view(WPEDisplay *display)
     return NULL;
 
   WPEViewGtk *view = WPE_VIEW_GTK(wpe_view_gtk_new(display_gtk));
-  /* FIXME: create the toplevel conditionally. */
-  GtkWindow *win = GTK_WINDOW(gtk_window_new());
-  gtk_window_set_default_size(win, 1024, 768);
-  gtk_window_set_child(win, wpe_view_gtk_get_widget(view));
-  gtk_window_present(win);
+
+  if (wpe_settings_get_boolean(wpe_display_get_settings(display), WPE_SETTING_CREATE_VIEWS_WITH_A_TOPLEVEL, NULL)) {
+    GtkWindow *win = GTK_WINDOW(gtk_window_new());
+    gtk_window_set_default_size(win, 1024, 768);
+    gtk_window_set_child(win, wpe_view_gtk_get_widget(view));
+    gtk_window_present(win);
+  }
 
   return WPE_VIEW(view);
 }
