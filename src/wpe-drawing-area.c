@@ -159,9 +159,11 @@ static void wpe_drawing_area_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
   gboolean notify_buffer_rendered = FALSE;
   if (area->pending_buffer) {
     notify_buffer_rendered = TRUE;
-    if (area->committed_buffer)
+    if (area->committed_buffer) {
       wpe_view_buffer_released(area->view, area->committed_buffer);
-    g_set_object(&area->committed_buffer, g_steal_pointer(&area->pending_buffer));
+      g_object_unref(area->committed_buffer);
+    }
+    area->committed_buffer = g_steal_pointer(&area->pending_buffer);
   }
 
   if (!area->committed_buffer)
@@ -561,20 +563,23 @@ static gboolean wpe_drawing_area_ensure_texture(WPEDrawingArea *area, WPEBuffer 
     wpe_buffer_set_user_data(buffer, buffer_gtk, (GDestroyNotify)wpe_buffer_gtk_free);
   }
 
+  g_clear_object(&buffer_gtk->texture);
+
   if (buffer_gtk->builder) {
     wpe_drawing_area_update_buffer_damage(area, buffer_gtk, damage_rects, n_damage_rects);
+
     g_autoptr(GError) buffer_error = NULL;
-    g_set_object(&buffer_gtk->texture, gdk_dmabuf_texture_builder_build(buffer_gtk->builder, NULL, NULL, &buffer_error));
+    buffer_gtk->texture = gdk_dmabuf_texture_builder_build(buffer_gtk->builder, NULL, NULL, &buffer_error);
     if (!buffer_gtk->texture) {
       g_set_error(error, WPE_VIEW_ERROR, WPE_VIEW_ERROR_RENDER_FAILED, "Failed to render buffer: failed to build DMA-BUF texture: %s", buffer_error->message);
       return FALSE;
     }
   } else {
-    g_set_object(&buffer_gtk->texture, gdk_memory_texture_new(wpe_buffer_get_width(buffer),
-                                                              wpe_buffer_get_height(buffer),
-                                                              GDK_MEMORY_DEFAULT,
-                                                              wpe_buffer_shm_get_data(WPE_BUFFER_SHM(buffer)),
-                                                              wpe_buffer_shm_get_stride(WPE_BUFFER_SHM(buffer))));
+    buffer_gtk->texture = gdk_memory_texture_new(wpe_buffer_get_width(buffer),
+                                                 wpe_buffer_get_height(buffer),
+                                                 GDK_MEMORY_DEFAULT,
+                                                 wpe_buffer_shm_get_data(WPE_BUFFER_SHM(buffer)),
+                                                 wpe_buffer_shm_get_stride(WPE_BUFFER_SHM(buffer)));
   }
 
   return TRUE;
