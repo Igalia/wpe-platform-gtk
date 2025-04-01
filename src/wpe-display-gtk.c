@@ -217,10 +217,12 @@ static gboolean wpe_display_gtk_connect(WPEDisplay *display, GError **error)
     display_gtk->egl_display = gdk_wayland_display_get_egl_display(display_gtk->display);
 #endif
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 #ifdef GDK_WINDOWING_X11
   if (GDK_IS_X11_DISPLAY(display_gtk->display))
     display_gtk->egl_display = gdk_x11_display_get_egl_display(display_gtk->display);
 #endif
+G_GNUC_END_IGNORE_DEPRECATIONS
 
   if (display_gtk->egl_display == EGL_NO_DISPLAY) {
     g_set_error_literal(error, WPE_DISPLAY_ERROR, WPE_DISPLAY_ERROR_CONNECTION_FAILED, "Failed to get GTK EGL display");
