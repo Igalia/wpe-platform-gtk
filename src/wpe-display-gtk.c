@@ -267,7 +267,7 @@ static WPEView *wpe_display_gtk_create_view(WPEDisplay *display)
   return WPE_VIEW(view);
 }
 
-static WPEKeymap *wpe_display_gtk_get_keymap(WPEDisplay *display, GError **error)
+static WPEKeymap *wpe_display_gtk_get_keymap(WPEDisplay *display)
 {
   WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
   if (!display_gtk->display)
