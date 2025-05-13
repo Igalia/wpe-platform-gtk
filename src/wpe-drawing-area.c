@@ -183,7 +183,7 @@ static WPEToplevel *get_or_create_toplevel_for_window(WPEDisplayGtk *display, Gt
 {
   WPEToplevel *toplevel = g_object_get_data(G_OBJECT(window), "wpe-toplevel");
   if (!toplevel) {
-    toplevel = wpe_toplevel_gtk_new(display, window);
+    toplevel = wpe_toplevel_gtk_new(display, 0, window);
     g_object_set_data_full(G_OBJECT(window), "wpe-toplevel", toplevel, g_object_unref);
   }
   return toplevel;

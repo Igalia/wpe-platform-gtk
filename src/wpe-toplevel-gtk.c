@@ -269,13 +269,14 @@ static void wpe_toplevel_gtk_init(WPEToplevelGtk *toplevel_gtk)
 {
 }
 
-WPEToplevel *wpe_toplevel_gtk_new(WPEDisplayGtk *display, GtkWindow *window)
+WPEToplevel *wpe_toplevel_gtk_new(WPEDisplayGtk *display, guint max_views, GtkWindow *window)
 {
   g_return_val_if_fail(WPE_IS_DISPLAY_GTK(display), NULL);
   g_return_val_if_fail(GTK_IS_WINDOW(window), NULL);
 
   return g_object_new(WPE_TYPE_TOPLEVEL_GTK,
                       "display", display,
+                      "max-views", max_views,
                       "window", window,
                       NULL);
 }

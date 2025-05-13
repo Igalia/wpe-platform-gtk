@@ -32,6 +32,7 @@ G_BEGIN_DECLS
 G_DECLARE_FINAL_TYPE(WPEToplevelGtk, wpe_toplevel_gtk, WPE, TOPLEVEL_GTK, WPEToplevel)
 
 WPEToplevel *wpe_toplevel_gtk_new           (WPEDisplayGtk  *display,
+                                             guint           max_views,
                                              GtkWindow      *window);
 GtkWindow   *wpe_toplevel_gtk_get_window    (WPEToplevelGtk *toplevel);
 gboolean     wpe_toplevel_gtk_is_in_screen  (WPEToplevelGtk *toplevel);
