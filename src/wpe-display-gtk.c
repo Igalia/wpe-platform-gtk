@@ -261,7 +261,6 @@ static WPEView *wpe_display_gtk_create_view(WPEDisplay *display)
 
   if (wpe_settings_get_boolean(wpe_display_get_settings(display), WPE_SETTING_CREATE_VIEWS_WITH_A_TOPLEVEL, NULL)) {
     GtkWindow *win = GTK_WINDOW(gtk_window_new());
-    gtk_window_set_default_size(win, 1024, 768);
     gtk_window_set_child(win, wpe_view_gtk_get_widget(view));
     gtk_window_present(win);
   }

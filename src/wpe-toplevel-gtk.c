@@ -138,6 +138,10 @@ static void wpe_toplevel_gtk_constructed(GObject *object)
   G_OBJECT_CLASS(wpe_toplevel_gtk_parent_class)->constructed(object);
 
   WPEToplevelGtk *toplevel_gtk = WPE_TOPLEVEL_GTK(object);
+  int width, height;
+  wpe_toplevel_get_size(WPE_TOPLEVEL(toplevel_gtk), &width, &height);
+  gtk_window_set_default_size(toplevel_gtk->window, width, height);
+
   if (gtk_widget_get_realized(GTK_WIDGET(toplevel_gtk->window)))
     wpe_toplevel_gtk_connect_surface_signals(toplevel_gtk);
   else
