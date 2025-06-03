@@ -79,8 +79,7 @@ static WPEBufferGtk *wpe_buffer_gtk_create(WPEBuffer *buffer)
   WPEBufferGtk *buffer_gtk = (WPEBufferGtk *)g_new0(WPEBufferGtk, 1);
 
   if (WPE_IS_BUFFER_DMA_BUF(buffer)) {
-    WPEView *view = wpe_buffer_get_view(WPE_BUFFER(buffer));
-    WPEDisplayGtk *display = WPE_DISPLAY_GTK(wpe_view_get_display(view));
+    WPEDisplayGtk *display = WPE_DISPLAY_GTK(wpe_buffer_get_display(buffer));
     WPEBufferDMABuf *buffer_dmabuf = WPE_BUFFER_DMA_BUF(buffer);
 
     GdkDmabufTextureBuilder *builder = gdk_dmabuf_texture_builder_new();
