@@ -45,8 +45,7 @@ struct _WPEDisplayGtk {
 
   GdkDisplay *display;
   EGLDisplay egl_display;
-  char *drm_device;
-  char *drm_render_node;
+  WPEDRMDevice *drm_device;
   WPEKeymap *keymap;
   GPtrArray *screens;
 
@@ -58,8 +57,7 @@ G_DEFINE_DYNAMIC_TYPE_EXTENDED(WPEDisplayGtk, wpe_display_gtk, WPE_TYPE_DISPLAY,
 static void wpe_display_gtk_finalize(GObject *object)
 {
   WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(object);
-  g_clear_pointer(&display_gtk->drm_device, g_free);
-  g_clear_pointer(&display_gtk->drm_render_node, g_free);
+  g_clear_pointer(&display_gtk->drm_device, wpe_drm_device_unref);
   g_clear_pointer(&display_gtk->screens, g_ptr_array_unref);
   g_clear_object(&display_gtk->keymap);
   g_clear_object(&display_gtk->desktop_settings);
@@ -233,10 +231,14 @@ G_GNUC_END_IGNORE_DEPRECATIONS
   EGLDeviceEXT egl_device;
   if (eglQueryDisplayAttribEXT(display_gtk->egl_display, EGL_DEVICE_EXT, (EGLAttrib*)&egl_device)) {
     const char *extensions = eglQueryDeviceStringEXT(egl_device, EGL_EXTENSIONS);
-    if (epoxy_extension_in_string(extensions, "EGL_EXT_device_drm"))
-      display_gtk->drm_device = g_strdup(eglQueryDeviceStringEXT(egl_device, EGL_DRM_DEVICE_FILE_EXT));
-    if (epoxy_extension_in_string(extensions, "EGL_EXT_device_drm_render_node"))
-      display_gtk->drm_render_node = g_strdup(eglQueryDeviceStringEXT(egl_device, EGL_DRM_RENDER_NODE_FILE_EXT));
+    if (epoxy_extension_in_string(extensions, "EGL_EXT_device_drm")) {
+      const char* drm_device = eglQueryDeviceStringEXT(egl_device, EGL_DRM_DEVICE_FILE_EXT);
+      const char* drm_render_node = NULL;
+      if (epoxy_extension_in_string(extensions, "EGL_EXT_device_drm_render_node"))
+        drm_render_node = eglQueryDeviceStringEXT(egl_device, EGL_DRM_RENDER_NODE_FILE_EXT);
+      if (drm_device)
+        display_gtk->drm_device = wpe_drm_device_new(drm_device, drm_render_node);
+    }
   }
 
   wpe_display_gtk_setup_screens(display_gtk);
@@ -303,14 +305,9 @@ static WPEBufferDMABufFormats *wpe_display_gtk_get_preferred_dma_buf_formats(WPE
   return wpe_buffer_dma_buf_formats_builder_end(builder);
 }
 
-const char *wpe_display_gtk_get_drm_device(WPEDisplay *display)
+static WPEDRMDevice *wpe_display_gtk_get_drm_device(WPEDisplay *display)
 {
   return WPE_DISPLAY_GTK(display)->drm_device;
-}
-
-const char *wpe_display_gtk_get_drm_render_node(WPEDisplay *display)
-{
-  return WPE_DISPLAY_GTK(display)->drm_render_node;
 }
 
 static guint wpe_display_gtk_get_n_screens(WPEDisplay *display)
@@ -349,7 +346,6 @@ static void wpe_display_gtk_class_init(WPEDisplayGtkClass *klass)
   display_class->get_keymap = wpe_display_gtk_get_keymap;
   display_class->get_preferred_dma_buf_formats = wpe_display_gtk_get_preferred_dma_buf_formats;
   display_class->get_drm_device = wpe_display_gtk_get_drm_device;
-  display_class->get_drm_render_node = wpe_display_gtk_get_drm_render_node;
   display_class->get_n_screens = wpe_display_gtk_get_n_screens;
   display_class->get_screen = wpe_display_gtk_get_screen;
   display_class->create_input_method_context = wpe_display_gtk_create_input_method_context;
