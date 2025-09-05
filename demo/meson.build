@@ -4,7 +4,7 @@ demo_sources = files(
   'wg-window.c'
 )
 
-wpe_webkit_dep = dependency('wpe-webkit-2.0', version: '>= 2.47.0')
+wpe_webkit_dep = dependency('wpe-webkit-2.0', version: '>= 2.49.90')
 adw_dep	= dependency('libadwaita-1', version: '>= 1.6')
 
 executable('wpe-gtk-demo',

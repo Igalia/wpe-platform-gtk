@@ -9,7 +9,7 @@ project(
 prefix = get_option('prefix')
 libdir = join_paths(prefix, get_option('libdir'))
 
-wpe_platform_dep = dependency('wpe-platform-2.0', version: '>= 2.47.0')
+wpe_platform_dep = dependency('wpe-platform-2.0', version: '>= 2.49.90')
 gmodule_dep = dependency('gmodule-2.0', version: '>= 2.70.0')
 gtk_dep = dependency('gtk4', version: '>= 4.16.0')
 epoxy_dep = dependency('epoxy', version: '>= 1.4')
