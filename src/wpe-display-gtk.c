@@ -23,6 +23,7 @@
 #include "wpe-display-gtk.h"
 
 #include "wpe-input-method-context-gtk.h"
+#include "wpe-clipboard-gtk.h"
 #include "wpe-keymap-gtk.h"
 #include "wpe-screen-gtk-private.h"
 #include "wpe-view-gtk.h"
@@ -47,6 +48,7 @@ struct _WPEDisplayGtk {
   EGLDisplay egl_display;
   WPEDRMDevice *drm_device;
   WPEKeymap *keymap;
+  WPEClipboard *clipboard;
   GPtrArray *screens;
 
   GSettings *desktop_settings;
@@ -60,6 +62,7 @@ static void wpe_display_gtk_finalize(GObject *object)
   g_clear_pointer(&display_gtk->drm_device, wpe_drm_device_unref);
   g_clear_pointer(&display_gtk->screens, g_ptr_array_unref);
   g_clear_object(&display_gtk->keymap);
+  g_clear_object(&display_gtk->clipboard);
   g_clear_object(&display_gtk->desktop_settings);
 
   G_OBJECT_CLASS(wpe_display_gtk_parent_class)->finalize(object);
@@ -282,6 +285,18 @@ static WPEKeymap *wpe_display_gtk_get_keymap(WPEDisplay *display)
   return display_gtk->keymap;
 }
 
+static WPEClipboard *wpe_display_gtk_get_clipboard(WPEDisplay *display)
+{
+  WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
+  if (!display_gtk->display)
+    return NULL;
+
+  if (!display_gtk->clipboard)
+    display_gtk->clipboard = wpe_clipboard_gtk_new(display_gtk->display);
+
+  return display_gtk->clipboard;
+}
+
 static WPEBufferDMABufFormats *wpe_display_gtk_get_preferred_dma_buf_formats(WPEDisplay *display)
 {
   WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
@@ -344,6 +359,7 @@ static void wpe_display_gtk_class_init(WPEDisplayGtkClass *klass)
   display_class->get_egl_display = wpe_display_gtk_get_egl_display;
   display_class->create_view = wpe_display_gtk_create_view;
   display_class->get_keymap = wpe_display_gtk_get_keymap;
+  display_class->get_clipboard = wpe_display_gtk_get_clipboard;
   display_class->get_preferred_dma_buf_formats = wpe_display_gtk_get_preferred_dma_buf_formats;
   display_class->get_drm_device = wpe_display_gtk_get_drm_device;
   display_class->get_n_screens = wpe_display_gtk_get_n_screens;

@@ -1,4 +1,5 @@
 libwpeplatformgtk_sources = files(
+  'wpe-clipboard-gtk.c',
   'wpe-display-gtk.c',
   'wpe-drawing-area.c',
   'wpe-input-method-context-gtk.c',
