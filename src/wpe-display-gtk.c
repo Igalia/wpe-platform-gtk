@@ -297,7 +297,7 @@ static WPEClipboard *wpe_display_gtk_get_clipboard(WPEDisplay *display)
   return display_gtk->clipboard;
 }
 
-static WPEBufferDMABufFormats *wpe_display_gtk_get_preferred_dma_buf_formats(WPEDisplay *display)
+static WPEBufferFormats *wpe_display_gtk_get_preferred_buffer_formats(WPEDisplay *display)
 {
   WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
   if (!display_gtk->display)
@@ -308,16 +308,16 @@ static WPEBufferDMABufFormats *wpe_display_gtk_get_preferred_dma_buf_formats(WPE
   if (!n_formats)
     return NULL;
 
-  WPEBufferDMABufFormatsBuilder *builder = wpe_buffer_dma_buf_formats_builder_new(NULL);
-  wpe_buffer_dma_buf_formats_builder_append_group(builder, NULL, WPE_BUFFER_DMA_BUF_FORMAT_USAGE_RENDERING);
+  WPEBufferFormatsBuilder *builder = wpe_buffer_formats_builder_new(NULL);
+  wpe_buffer_formats_builder_append_group(builder, NULL, WPE_BUFFER_FORMAT_USAGE_RENDERING);
   for (gsize i = 0; i < n_formats; i++) {
     guint32 fourcc;
     guint64 modifier;
     gdk_dmabuf_formats_get_format(formats, i, &fourcc, &modifier);
-    wpe_buffer_dma_buf_formats_builder_append_format(builder, fourcc, modifier);
+    wpe_buffer_formats_builder_append_format(builder, fourcc, modifier);
   }
 
-  return wpe_buffer_dma_buf_formats_builder_end(builder);
+  return wpe_buffer_formats_builder_end(builder);
 }
 
 static WPEDRMDevice *wpe_display_gtk_get_drm_device(WPEDisplay *display)
@@ -360,7 +360,7 @@ static void wpe_display_gtk_class_init(WPEDisplayGtkClass *klass)
   display_class->create_view = wpe_display_gtk_create_view;
   display_class->get_keymap = wpe_display_gtk_get_keymap;
   display_class->get_clipboard = wpe_display_gtk_get_clipboard;
-  display_class->get_preferred_dma_buf_formats = wpe_display_gtk_get_preferred_dma_buf_formats;
+  display_class->get_preferred_buffer_formats = wpe_display_gtk_get_preferred_buffer_formats;
   display_class->get_drm_device = wpe_display_gtk_get_drm_device;
   display_class->get_n_screens = wpe_display_gtk_get_n_screens;
   display_class->get_screen = wpe_display_gtk_get_screen;
