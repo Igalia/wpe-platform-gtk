@@ -36,6 +36,8 @@ struct _WGWindow {
   GtkWidget *url_entry;
   AdwTabBar *tab_bar;
   AdwTabView *tab_view;
+  GtkWidget *tab_overview;
+  GtkWidget *overview_button;
   WebKitWebView *current_web_view;
   guint progress_timeout_id;
 };
@@ -121,10 +123,18 @@ static void wg_window_new_tab(GSimpleAction *action, GVariant *parameter, gpoint
   gtk_widget_grab_focus(win->url_entry);
 }
 
+static void wg_window_tab_overview(GSimpleAction *action, GVariant *parameter, gpointer user_data)
+{
+  WGWindow *win = WG_WINDOW(user_data);
+  adw_tab_overview_set_open(ADW_TAB_OVERVIEW(win->tab_overview),
+                            !adw_tab_overview_get_open(ADW_TAB_OVERVIEW(win->tab_overview)));
+}
+
 static const GActionEntry actions[] = {
   { "go-back", wg_window_go_back },
   { "go-forward", wg_window_go_forward },
   { "new-tab", wg_window_new_tab },
+  { "tab-overview", wg_window_tab_overview },
 };
 
 static void wg_window_update_url(WGWindow *win)
@@ -226,6 +236,12 @@ static void wg_window_selected_page_changed(AdwTabView *tab_view_adw, GParamSpec
   }
 }
 
+static AdwTabPage *wg_window_create_tab(WGWindow *win)
+{
+  wg_window_new_tab(NULL, NULL, win);
+  return adw_tab_view_get_selected_page(win->tab_view);
+}
+
 static void wg_window_constructed(GObject *object)
 {
   G_OBJECT_CLASS(wg_window_parent_class)->constructed(object);
@@ -277,7 +293,22 @@ static void wg_window_constructed(GObject *object)
   adw_tab_bar_set_view(win->tab_bar, win->tab_view);
   adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(win->toolbar_view), GTK_WIDGET(win->tab_view));
 
-  adw_application_window_set_content(ADW_APPLICATION_WINDOW(win), win->toolbar_view);
+  win->tab_overview = adw_tab_overview_new();
+  adw_tab_overview_set_enable_new_tab(ADW_TAB_OVERVIEW(win->tab_overview), TRUE);
+  g_signal_connect_object(win->tab_overview, "create-tab", G_CALLBACK(wg_window_create_tab), win, G_CONNECT_SWAPPED);
+  adw_tab_overview_set_view(ADW_TAB_OVERVIEW(win->tab_overview), win->tab_view);
+  adw_tab_overview_set_child(ADW_TAB_OVERVIEW(win->tab_overview), win->toolbar_view);
+
+  GtkWidget *end_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+
+  win->overview_button = gtk_button_new_from_icon_name("view-grid-symbolic");
+  gtk_actionable_set_action_name(GTK_ACTIONABLE(win->overview_button), "win.tab-overview");
+  gtk_widget_add_css_class(win->overview_button, "toolbar-button");
+  gtk_box_append(GTK_BOX(end_box), win->overview_button);
+
+  adw_header_bar_pack_end(ADW_HEADER_BAR(win->header_bar), end_box);
+
+  adw_application_window_set_content(ADW_APPLICATION_WINDOW(win), win->tab_overview);
 }
 
 static void wg_window_dispose(GObject *object)
