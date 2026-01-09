@@ -31,8 +31,12 @@ G_BEGIN_DECLS
 #define WPE_TYPE_VIEW_GTK (wpe_view_gtk_get_type())
 G_DECLARE_FINAL_TYPE(WPEViewGtk, wpe_view_gtk, WPE, VIEW_GTK, WPEView)
 
-WPEView   *wpe_view_gtk_new        (WPEDisplayGtk *display);
-GtkWidget *wpe_view_gtk_get_widget (WPEViewGtk    *view);
+WPEView   *wpe_view_gtk_new               (WPEDisplayGtk *display);
+GtkWidget *wpe_view_gtk_get_widget        (WPEViewGtk    *view);
+void       wpe_view_gtk_show_context_menu (WPEViewGtk    *view,
+                                           GMenuModel    *menu,
+                                           GActionGroup  *group,
+                                           GdkRectangle  *rect);
 
 G_END_DECLS
 

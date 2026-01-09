@@ -53,6 +53,8 @@ struct _WPEDrawingArea {
 
   MotionEvent last_motion_event;
 
+  GtkWidget *context_menu;
+
 #ifdef GTK_ACCESSIBILITY_ATSPI
   GtkAccessible *accessible;
 #endif
@@ -135,6 +137,7 @@ static void wpe_drawing_area_dispose(GObject *object)
   g_clear_object(&area->view);
   g_clear_object(&area->pending_buffer);
   g_clear_object(&area->committed_buffer);
+  g_clear_pointer(&area->context_menu, gtk_widget_unparent);
 
 #ifdef GTK_ACCESSIBILITY_ATSPI
   g_clear_object(&area->accessible);
@@ -594,6 +597,25 @@ gboolean wpe_drawing_area_render_buffer(WPEDrawingArea *area, WPEBuffer *buffer,
   g_set_object(&area->pending_buffer, buffer);
   gtk_widget_queue_draw(GTK_WIDGET(area));
   return TRUE;
+}
+
+void wpe_drawing_area_show_context_menu(WPEDrawingArea *area, GMenuModel *menu, GActionGroup *group, GdkRectangle *rect)
+{
+  g_return_if_fail(WPE_IS_DRAWING_AREA(area));
+
+  if (!area->context_menu) {
+    area->context_menu = gtk_popover_menu_new_from_model(menu);
+    gtk_popover_set_has_arrow(GTK_POPOVER(area->context_menu), FALSE);
+    gtk_popover_set_position(GTK_POPOVER(area->context_menu), GTK_POS_BOTTOM);
+    gtk_widget_set_halign(area->context_menu, GTK_ALIGN_START);
+    gtk_widget_set_parent(area->context_menu, GTK_WIDGET(area));
+  } else {
+    gtk_popover_menu_set_menu_model(GTK_POPOVER_MENU(area->context_menu), menu);
+  }
+
+  gtk_widget_insert_action_group(area->context_menu, "wpeContextMenu", group);
+  gtk_popover_set_pointing_to(GTK_POPOVER(area->context_menu), rect);
+  gtk_popover_popup(GTK_POPOVER(area->context_menu));
 }
 
 #ifdef GTK_ACCESSIBILITY_ATSPI

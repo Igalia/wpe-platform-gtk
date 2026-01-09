@@ -24,6 +24,7 @@
 
 #include "wg-application.h"
 #include "wg-tab-view.h"
+#include "wpe-view-gtk.h"
 
 struct _WGWindow {
   AdwApplicationWindow parent;
@@ -204,6 +205,67 @@ static WebKitWebView *wg_window_web_view_create(WGWindow *win, WebKitNavigationA
   return web_view;
 }
 
+static GMenu *build_context_menu(GList *items, GSimpleActionGroup *action_group)
+{
+  GMenu *menu = g_menu_new();
+  GMenu *section_menu = menu;
+  for (GList *l = items; l != NULL; l = g_list_next(l)) {
+    WebKitContextMenuItem *item = WEBKIT_CONTEXT_MENU_ITEM(l->data);
+
+    if (webkit_context_menu_item_is_separator(item)) {
+      GMenu *section = g_menu_new();
+      g_menu_append_section(menu, NULL, G_MENU_MODEL(section));
+      section_menu = section;
+      g_object_unref(section);
+    } else {
+      GAction *action = webkit_context_menu_item_get_gaction(item);
+      if (action) {
+        g_action_map_add_action(G_ACTION_MAP(action_group), action);
+
+        GMenuItem *menu_item;
+        WebKitContextMenu *subcontext_menu = webkit_context_menu_item_get_submenu(item);
+        if (subcontext_menu) {
+          GMenu *submenu = build_context_menu(webkit_context_menu_get_items(subcontext_menu), action_group);
+          menu_item = g_menu_item_new_submenu(webkit_context_menu_item_get_title(item), G_MENU_MODEL(submenu));
+          g_object_unref(submenu);
+        } else {
+          menu_item = g_menu_item_new(webkit_context_menu_item_get_title(item), NULL);
+          char *action_name = g_strdup_printf("wpeContextMenu.%s", g_action_get_name(action));
+          g_menu_item_set_action_and_target_value(menu_item, action_name, webkit_context_menu_item_get_gaction_target(item));
+          g_free(action_name);
+        }
+        g_menu_append_item(section_menu, menu_item);
+        g_object_unref(menu_item);
+      }
+    }
+  }
+  return menu;
+}
+
+static gboolean wg_window_web_view_context_menu(WGWindow *win, WebKitContextMenu *context_menu, WebKitHitTestResult *hit_test_result)
+{
+  if (!win->current_web_view)
+    return FALSE;
+
+  GSimpleActionGroup *action_group = g_simple_action_group_new();
+  GMenu *menu = build_context_menu(webkit_context_menu_get_items(context_menu), action_group);
+  if (g_menu_model_get_n_items(G_MENU_MODEL(menu)) == 0) {
+    g_object_unref(menu);
+    g_object_unref(action_group);
+    return FALSE;
+  }
+
+  GdkRectangle target = { 0, 0, 1, 1 };
+  gboolean has_position = webkit_context_menu_get_position(context_menu, &target.x, &target.y);
+
+  wpe_view_gtk_show_context_menu(WPE_VIEW_GTK(webkit_web_view_get_wpe_view(win->current_web_view)),
+                                 G_MENU_MODEL(menu), G_ACTION_GROUP(action_group), has_position ? &target : NULL);
+  g_object_unref(action_group);
+  g_object_unref(menu);
+
+  return TRUE;
+}
+
 static void wg_window_selected_page_changed(AdwTabView *tab_view_adw, GParamSpec *pspec, WGWindow *win)
 {
   if (win->current_web_view) {
@@ -230,6 +292,7 @@ static void wg_window_selected_page_changed(AdwTabView *tab_view_adw, GParamSpec
     g_signal_connect_object(win->current_web_view, "notify::estimated-load-progress", G_CALLBACK(wg_window_update_load_progress), win, G_CONNECT_SWAPPED);
     g_signal_connect_object(win->current_web_view, "decide-policy", G_CALLBACK(wg_window_decide_policy), win, G_CONNECT_SWAPPED);
     g_signal_connect_object(win->current_web_view, "create", G_CALLBACK(wg_window_web_view_create), win, G_CONNECT_SWAPPED);
+    g_signal_connect_object(win->current_web_view, "context-menu", G_CALLBACK(wg_window_web_view_context_menu), win, G_CONNECT_SWAPPED);
 
     WebKitBackForwardList *backForwardlist = webkit_web_view_get_back_forward_list(win->current_web_view);
     g_signal_connect_object(backForwardlist, "changed", G_CALLBACK(wg_window_update_navigation_actions), win, G_CONNECT_SWAPPED);

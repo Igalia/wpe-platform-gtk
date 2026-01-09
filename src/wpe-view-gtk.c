@@ -168,3 +168,13 @@ GtkWidget *wpe_view_gtk_get_widget(WPEViewGtk *view)
 
   return GTK_WIDGET(view->drawing_area);
 }
+
+void wpe_view_gtk_show_context_menu(WPEViewGtk *view, GMenuModel *menu, GActionGroup *group, GdkRectangle *rect)
+{
+  g_return_if_fail(WPE_IS_VIEW_GTK(view));
+  g_return_if_fail(G_IS_MENU_MODEL(menu));
+  g_return_if_fail(G_IS_ACTION_GROUP(group));
+
+  if (view->drawing_area)
+    wpe_drawing_area_show_context_menu(view->drawing_area, menu, group, rect);
+}

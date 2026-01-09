@@ -30,11 +30,15 @@ G_BEGIN_DECLS
 #define WPE_TYPE_DRAWING_AREA (wpe_drawing_area_get_type())
 G_DECLARE_FINAL_TYPE(WPEDrawingArea, wpe_drawing_area, WPE, DRAWING_AREA, GtkWidget)
 
-GtkWidget *wpe_drawing_area_new           (WPEView            *view);
-gboolean   wpe_drawing_area_render_buffer (WPEDrawingArea     *area,
-                                           WPEBuffer          *buffer,
-                                           const WPERectangle *damage_rects,
-                                           guint               n_damage_rects,
-                                           GError            **error);
+GtkWidget *wpe_drawing_area_new               (WPEView            *view);
+gboolean   wpe_drawing_area_render_buffer     (WPEDrawingArea     *area,
+                                               WPEBuffer          *buffer,
+                                               const WPERectangle *damage_rects,
+                                               guint               n_damage_rects,
+                                               GError            **error);
+void       wpe_drawing_area_show_context_menu (WPEDrawingArea     *area,
+                                               GMenuModel         *menu,
+                                               GActionGroup       *group,
+                                               GdkRectangle       *rect);
 
 G_END_DECLS
