@@ -22,6 +22,7 @@
 
 #include "wg-window.h"
 
+#include "wg-application.h"
 #include "wg-tab-view.h"
 
 struct _WGWindow {
@@ -102,20 +103,18 @@ static AdwTabPage *wg_window_add_tab_page_for_view(WGWindow *win, WebKitWebView 
 
 static WebKitWebView *wg_window_create_web_view_for_new_tab(WGWindow *win)
 {
+  WGApplication *app = wg_application_get();
   return WEBKIT_WEB_VIEW(g_object_new(WEBKIT_TYPE_WEB_VIEW,
-    "display", wpe_view_get_display(webkit_web_view_get_wpe_view(win->current_web_view)),
-    "web-context", webkit_web_view_get_context(win->current_web_view),
-    "network-session", webkit_web_view_get_network_session(win->current_web_view),
-    "settings", webkit_web_view_get_settings(win->current_web_view),
+    "display", wg_application_get_display(app),
+    "web-context", wg_application_get_web_context(app),
+    "network-session", wg_application_get_network_session(app),
+    "settings", wg_application_get_web_settings(app),
     NULL));
 }
 
 static void wg_window_new_tab(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
   WGWindow *win = WG_WINDOW(user_data);
-  if (!win->current_web_view)
-    return;
-
   WebKitWebView *web_view = wg_window_create_web_view_for_new_tab(win);
   AdwTabPage *tab_page = wg_window_add_tab_page_for_view(win, web_view);
   adw_tab_view_set_selected_page(win->tab_view, tab_page);

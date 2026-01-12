@@ -20,6 +20,7 @@
  * SOFTWARE.
  */
 
+#include "wg-application.h"
 #include "wg-window.h"
 #include "wpe-display-gtk.h"
 #include "wpe-view-gtk.h"
@@ -36,25 +37,15 @@ static const GOptionEntry cmd_options[] = {
 
 static void activate(GApplication *application)
 {
-  WPEDisplay *display = wpe_display_gtk_new();
-  wpe_settings_set_boolean(wpe_display_get_settings(display), WPE_SETTING_CREATE_VIEWS_WITH_A_TOPLEVEL, FALSE, WPE_SETTINGS_SOURCE_APPLICATION, NULL);
+  WGApplication *app = WG_APPLICATION(application);
 
-  GError *error = NULL;
-  if (!wpe_display_connect (display, &error)) {
-    g_warning("Failed to connect to display: %s", error->message);
-    g_error_free(error);
-    g_application_quit(application);
-    return;
-  }
+  WPEDisplay *display = wg_application_get_display(app);
+  WebKitWebContext *web_context = wg_application_get_web_context(app);
 
-  char *data_dir = g_build_filename(g_get_user_data_dir(), "wpeplatformgtk", "demo", NULL);
-  char *cache_dir = g_build_filename(g_get_user_cache_dir(), "wpeplatformgtk", "demo", NULL);
-  WebKitNetworkSession *network_session = webkit_network_session_new(data_dir, cache_dir);
-  g_free(data_dir);
-  g_free(cache_dir);
+  WebKitNetworkSession *network_session = wg_application_get_network_session(app);
   webkit_network_session_set_itp_enabled(network_session, TRUE);
 
-  WebKitWebContext *web_context = webkit_web_context_new();
+  WebKitSettings *settings = wg_application_get_web_settings(app);
 
   GtkWindow *win = GTK_WINDOW(wg_window_new());
   gtk_window_set_application(win, GTK_APPLICATION(application));
@@ -63,7 +54,7 @@ static void activate(GApplication *application)
     int i;
 
     for (i = 0; uri_args[i] != NULL; i++) {
-      WebKitWebView *web_view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "network-session", network_session, "web-context", web_context, "display", display, NULL);
+      WebKitWebView *web_view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "network-session", network_session, "web-context", web_context, "display", display, "settings", settings, NULL);
       wg_window_add_web_view(WG_WINDOW(win), web_view);
 
       GFile *file = g_file_new_for_commandline_arg(uri_args[i]);
@@ -74,13 +65,11 @@ static void activate(GApplication *application)
       g_object_unref(web_view);
     }
   } else {
-    WebKitWebView *web_view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "network-session", network_session, "web-context", web_context, "display", display, NULL);
+    WebKitWebView *web_view = g_object_new(WEBKIT_TYPE_WEB_VIEW, "network-session", network_session, "web-context", web_context, "display", display, "settings", settings, NULL);
     wg_window_add_web_view(WG_WINDOW(win), web_view);
     webkit_web_view_load_uri(web_view, "https://wpewebkit.org");
     g_object_unref(web_view);
   }
-  g_object_unref(web_context);
-  g_object_unref(network_session);
 
   gtk_window_present(win);
 }
@@ -99,7 +88,7 @@ int main(int argc, char **argv)
   }
   g_option_context_free(context);
 
-  AdwApplication *app = adw_application_new("org.wpePlatformGtk.Demo", G_APPLICATION_NON_UNIQUE);
+  WGApplication *app = wg_application_new();
   g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
   g_application_run(G_APPLICATION(app), 0, NULL);
   g_object_unref(app);

@@ -1,5 +1,6 @@
 demo_sources = files(
   'main.c',
+  'wg-application.c',
   'wg-tab-view.c',
   'wg-window.c'
 )
