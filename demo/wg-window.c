@@ -198,14 +198,23 @@ static gboolean wg_window_decide_policy(WGWindow *win, WebKitPolicyDecision *dec
   return TRUE;
 }
 
+static void wg_window_web_view_ready_to_show(WGWindow *win, WebKitWebView *web_view)
+{
+  gtk_widget_grab_focus(wpe_view_gtk_get_widget(WPE_VIEW_GTK(webkit_web_view_get_wpe_view(web_view))));
+  gtk_window_present(GTK_WINDOW(win));
+}
+
 static WebKitWebView *wg_window_web_view_create(WGWindow *win, WebKitNavigationAction *navigation)
 {
   WebKitWebView *web_view = WEBKIT_WEB_VIEW(g_object_new(WEBKIT_TYPE_WEB_VIEW,
     "related-view", win->current_web_view,
     "settings", webkit_web_view_get_settings(win->current_web_view),
     NULL));
-  AdwTabPage *tab_page = wg_window_add_tab_page_for_view(win, web_view);
-  adw_tab_view_set_selected_page(win->tab_view, tab_page);
+
+  GtkWindow *new_win = GTK_WINDOW(wg_window_new());
+  gtk_window_set_application(GTK_WINDOW(new_win), gtk_window_get_application(GTK_WINDOW(win)));
+  wg_window_add_web_view(WG_WINDOW(new_win), web_view);
+  g_signal_connect_object(web_view, "ready-to-show", G_CALLBACK(wg_window_web_view_ready_to_show), new_win, G_CONNECT_SWAPPED);
   return web_view;
 }
 
