@@ -24,11 +24,13 @@
 
 #include "wg-application.h"
 #include "wg-tab-view.h"
+#include "wpe-toplevel-gtk.h"
 #include "wpe-view-gtk.h"
 
 struct _WGWindow {
   AdwApplicationWindow parent;
 
+  WPEToplevel *toplevel;
   GtkWidget *toolbar_view;
   GtkWidget *header_bar;
   GtkWidget *back_button;
@@ -100,6 +102,8 @@ static AdwTabPage *wg_window_add_tab_page_for_view(WGWindow *win, WebKitWebView 
   g_object_bind_property(G_OBJECT(web_view), "is-loading", tab_page, "loading", G_BINDING_SYNC_CREATE);
 
   g_signal_connect_object(web_view, "close", G_CALLBACK(wg_window_close_tab), win, G_CONNECT_SWAPPED);
+
+  wpe_view_set_toplevel(webkit_web_view_get_wpe_view(web_view), win->toplevel);
 
   return tab_page;
 }
@@ -372,6 +376,9 @@ static void wg_window_constructed(GObject *object)
   adw_header_bar_pack_end(ADW_HEADER_BAR(win->header_bar), end_box);
 
   adw_application_window_set_content(ADW_APPLICATION_WINDOW(win), win->tab_overview);
+
+  WGApplication *app = wg_application_get();
+  win->toplevel = wpe_toplevel_gtk_new(WPE_DISPLAY_GTK(wg_application_get_display(app)), 0, GTK_WINDOW(win));
 }
 
 static void wg_window_dispose(GObject *object)
@@ -386,6 +393,7 @@ static void wg_window_finalize(GObject *object)
 {
   WGWindow *win = WG_WINDOW(object);
   g_clear_object(&win->current_web_view);
+  g_clear_object(&win->toplevel);
 
   G_OBJECT_CLASS(wg_window_parent_class)->finalize(object);
 }

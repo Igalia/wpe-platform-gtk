@@ -42,12 +42,31 @@ static void wpe_view_gtk_monitor_changed(WPEView *view, GParamSpec *pspec, gpoin
     wpe_view_unmap(view);
 }
 
+static void wpe_view_gtk_toplevel_changed(WPEView *view, GParamSpec *pspec, gpointer user_data)
+{
+  WPEToplevel *toplevel = wpe_view_get_toplevel(view);
+  if (!toplevel)
+    return;
+
+  WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
+  if (!view_gtk->drawing_area)
+    return;
+
+  GtkWindow *window = wpe_toplevel_gtk_get_window(WPE_TOPLEVEL_GTK(toplevel));
+  if (gtk_widget_get_root(GTK_WIDGET(view_gtk->drawing_area)) == GTK_ROOT(window))
+    return;
+
+  gtk_window_set_child(window, GTK_WIDGET(view_gtk->drawing_area));
+  gtk_window_present(window);
+}
+
 static void wpe_view_gtk_constructed(GObject *object)
 {
   G_OBJECT_CLASS(wpe_view_gtk_parent_class)->constructed(object);
 
   WPEViewGtk *view_gtk = WPE_VIEW_GTK(object);
   g_signal_connect(view_gtk, "notify::monitor", G_CALLBACK(wpe_view_gtk_monitor_changed), NULL);
+  g_signal_connect(view_gtk, "notify::toplevel", G_CALLBACK(wpe_view_gtk_toplevel_changed), NULL);
 }
 
 static void wpe_view_gtk_finalize(GObject *object)

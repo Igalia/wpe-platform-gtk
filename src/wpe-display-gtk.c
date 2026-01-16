@@ -26,6 +26,7 @@
 #include "wpe-clipboard-gtk.h"
 #include "wpe-keymap-gtk.h"
 #include "wpe-screen-gtk-private.h"
+#include "wpe-toplevel-gtk.h"
 #include "wpe-view-gtk.h"
 #include <epoxy/egl.h>
 
@@ -262,15 +263,16 @@ static WPEView *wpe_display_gtk_create_view(WPEDisplay *display)
   if (!display_gtk->display)
     return NULL;
 
-  WPEViewGtk *view = WPE_VIEW_GTK(wpe_view_gtk_new(display_gtk));
+  return wpe_view_gtk_new(display_gtk);
+}
 
-  if (wpe_settings_get_boolean(wpe_display_get_settings(display), WPE_SETTING_CREATE_VIEWS_WITH_A_TOPLEVEL, NULL)) {
-    GtkWindow *win = GTK_WINDOW(gtk_window_new());
-    gtk_window_set_child(win, wpe_view_gtk_get_widget(view));
-    gtk_window_present(win);
-  }
+static WPEToplevel *wpe_display_gtk_create_toplevel(WPEDisplay *display, guint max_views)
+{
+  WPEDisplayGtk *display_gtk = WPE_DISPLAY_GTK(display);
+  if (!display_gtk->display)
+    return NULL;
 
-  return WPE_VIEW(view);
+  return wpe_toplevel_gtk_new(display_gtk, max_views, GTK_WINDOW(gtk_window_new()));
 }
 
 static WPEKeymap *wpe_display_gtk_get_keymap(WPEDisplay *display)
@@ -358,6 +360,7 @@ static void wpe_display_gtk_class_init(WPEDisplayGtkClass *klass)
   display_class->connect = wpe_display_gtk_connect;
   display_class->get_egl_display = wpe_display_gtk_get_egl_display;
   display_class->create_view = wpe_display_gtk_create_view;
+  display_class->create_toplevel = wpe_display_gtk_create_toplevel;
   display_class->get_keymap = wpe_display_gtk_get_keymap;
   display_class->get_clipboard = wpe_display_gtk_get_clipboard;
   display_class->get_preferred_buffer_formats = wpe_display_gtk_get_preferred_buffer_formats;

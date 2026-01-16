@@ -181,27 +181,6 @@ static void wpe_drawing_area_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
     wpe_view_buffer_rendered(area->view, area->committed_buffer);
 }
 
-static WPEToplevel *get_or_create_toplevel_for_window(WPEDisplayGtk *display, GtkWindow *window)
-{
-  WPEToplevel *toplevel = g_object_get_data(G_OBJECT(window), "wpe-toplevel");
-  if (!toplevel) {
-    toplevel = wpe_toplevel_gtk_new(display, 0, window);
-    g_object_set_data_full(G_OBJECT(window), "wpe-toplevel", toplevel, g_object_unref);
-  }
-  return toplevel;
-}
-
-static void wpe_drawing_area_root(GtkWidget *widget)
-{
-  WPEDrawingArea *area = WPE_DRAWING_AREA(widget);
-
-  GTK_WIDGET_CLASS(wpe_drawing_area_parent_class)->root(widget);
-
-  GtkWindow *window = GTK_WINDOW(gtk_widget_get_root(widget));
-  WPEToplevel *toplevel = get_or_create_toplevel_for_window(WPE_DISPLAY_GTK(wpe_view_get_display(area->view)), window);
-  wpe_view_set_toplevel(area->view, toplevel);
-}
-
 static void wpe_drawing_area_unroot(GtkWidget *widget)
 {
   WPEDrawingArea *area = WPE_DRAWING_AREA(widget);
@@ -244,7 +223,6 @@ static void wpe_drawing_area_class_init(WPEDrawingAreaClass *klass)
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
   widget_class->size_allocate = wpe_drawing_area_size_allocate;
   widget_class->snapshot = wpe_drawing_area_snapshot;
-  widget_class->root = wpe_drawing_area_root;
   widget_class->unroot = wpe_drawing_area_unroot;
   widget_class->map = wpe_drawing_area_map;
   widget_class->unmap = wpe_drawing_area_unmap;
