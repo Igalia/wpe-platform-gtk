@@ -43,6 +43,7 @@ struct _WGWindow {
   GtkWidget *overview_button;
   WebKitWebView *current_web_view;
   guint progress_timeout_id;
+  GActionGroup *context_menu_action_group;
 };
 
 G_DEFINE_FINAL_TYPE(WGWindow, wg_window, ADW_TYPE_APPLICATION_WINDOW)
@@ -142,6 +143,24 @@ static const GActionEntry actions[] = {
   { "tab-overview", wg_window_tab_overview },
 };
 
+static void wg_window_open_in_new_tab(GSimpleAction *action, GVariant *parameter, gpointer user_data)
+{
+  WGWindow *win = WG_WINDOW(user_data);
+  WebKitWebView *web_view = wg_window_create_web_view_for_new_tab(win);
+  AdwTabPage *tab_page = wg_window_add_tab_page_for_view(win, web_view);
+  adw_tab_view_set_selected_page(win->tab_view, tab_page);
+  if (parameter) {
+    const char *uri = g_variant_get_string(parameter, NULL);
+    if (uri)
+      webkit_web_view_load_uri(web_view, uri);
+  }
+  g_object_unref(web_view);
+}
+
+static const GActionEntry context_menu_actions[] = {
+  { "open-in-new-tab", wg_window_open_in_new_tab, "s" },
+};
+
 static void wg_window_update_url(WGWindow *win)
 {
   const char *url = win->current_web_view ? webkit_web_view_get_uri(win->current_web_view) : NULL;
@@ -218,7 +237,7 @@ static WebKitWebView *wg_window_web_view_create(WGWindow *win, WebKitNavigationA
   return web_view;
 }
 
-static GMenu *build_context_menu(GList *items, GSimpleActionGroup *action_group)
+static GMenu *build_context_menu(GList *items, GSimpleActionGroup *action_group, WebKitHitTestResult *hit_test_result)
 {
   GMenu *menu = g_menu_new();
   GMenu *section_menu = menu;
@@ -230,6 +249,13 @@ static GMenu *build_context_menu(GList *items, GSimpleActionGroup *action_group)
       g_menu_append_section(menu, NULL, G_MENU_MODEL(section));
       section_menu = section;
       g_object_unref(section);
+    } else if (webkit_context_menu_item_get_stock_action(item) == WEBKIT_CONTEXT_MENU_ACTION_OPEN_LINK &&
+               webkit_hit_test_result_context_is_link (hit_test_result)) {
+      GMenuItem *menu_item = g_menu_item_new("Open Link in New Tab", NULL);
+      const char *uri = webkit_hit_test_result_get_link_uri(hit_test_result);
+      g_menu_item_set_action_and_target(menu_item, "popup.open-in-new-tab", "s", uri);
+      g_menu_append_item(section_menu, menu_item);
+      g_object_unref(menu_item);
     } else {
       GAction *action = webkit_context_menu_item_get_gaction(item);
       if (action) {
@@ -238,7 +264,7 @@ static GMenu *build_context_menu(GList *items, GSimpleActionGroup *action_group)
         GMenuItem *menu_item;
         WebKitContextMenu *subcontext_menu = webkit_context_menu_item_get_submenu(item);
         if (subcontext_menu) {
-          GMenu *submenu = build_context_menu(webkit_context_menu_get_items(subcontext_menu), action_group);
+          GMenu *submenu = build_context_menu(webkit_context_menu_get_items(subcontext_menu), action_group, hit_test_result);
           menu_item = g_menu_item_new_submenu(webkit_context_menu_item_get_title(item), G_MENU_MODEL(submenu));
           g_object_unref(submenu);
         } else {
@@ -261,7 +287,7 @@ static gboolean wg_window_web_view_context_menu(WGWindow *win, WebKitContextMenu
     return FALSE;
 
   GSimpleActionGroup *action_group = g_simple_action_group_new();
-  GMenu *menu = build_context_menu(webkit_context_menu_get_items(context_menu), action_group);
+  GMenu *menu = build_context_menu(webkit_context_menu_get_items(context_menu), action_group, hit_test_result);
   if (g_menu_model_get_n_items(G_MENU_MODEL(menu)) == 0) {
     g_object_unref(menu);
     g_object_unref(action_group);
@@ -324,6 +350,10 @@ static void wg_window_constructed(GObject *object)
 
   WGWindow *win = WG_WINDOW(object);
   g_action_map_add_action_entries(G_ACTION_MAP(win), actions, G_N_ELEMENTS(actions), win);
+
+  win->context_menu_action_group = G_ACTION_GROUP(g_simple_action_group_new());
+  g_action_map_add_action_entries(G_ACTION_MAP(win->context_menu_action_group), context_menu_actions, G_N_ELEMENTS(context_menu_actions), win);
+  gtk_widget_insert_action_group(GTK_WIDGET(win), "popup", win->context_menu_action_group);
 
   win->toolbar_view = adw_toolbar_view_new();
 
@@ -403,6 +433,7 @@ static void wg_window_finalize(GObject *object)
   WGWindow *win = WG_WINDOW(object);
   g_clear_object(&win->current_web_view);
   g_clear_object(&win->toplevel);
+  g_clear_object(&win->context_menu_action_group);
 
   G_OBJECT_CLASS(wg_window_parent_class)->finalize(object);
 }
