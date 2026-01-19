@@ -127,6 +127,7 @@ static void wg_window_new_tab(GSimpleAction *action, GVariant *parameter, gpoint
   AdwTabPage *tab_page = wg_window_add_tab_page_for_view(win, web_view);
   adw_tab_view_set_selected_page(win->tab_view, tab_page);
   gtk_widget_grab_focus(win->url_entry);
+  g_object_unref(web_view);
 }
 
 static void wg_window_tab_overview(GSimpleAction *action, GVariant *parameter, gpointer user_data)
@@ -212,6 +213,7 @@ static gboolean wg_window_decide_policy(WGWindow *win, WebKitPolicyDecision *dec
   WebKitWebView *web_view = wg_window_create_web_view_for_new_tab(win);
   wg_window_add_tab_page_for_view(win, web_view);
   webkit_web_view_load_request(web_view, webkit_navigation_action_get_request(action));
+  g_object_unref(web_view);
 
   webkit_policy_decision_ignore(decision);
   return TRUE;
@@ -234,6 +236,7 @@ static WebKitWebView *wg_window_web_view_create(WGWindow *win, WebKitNavigationA
   gtk_window_set_application(GTK_WINDOW(new_win), gtk_window_get_application(GTK_WINDOW(win)));
   wg_window_add_web_view(WG_WINDOW(new_win), web_view);
   g_signal_connect_object(web_view, "ready-to-show", G_CALLBACK(wg_window_web_view_ready_to_show), new_win, G_CONNECT_SWAPPED);
+  g_object_unref(web_view);
   return web_view;
 }
 
