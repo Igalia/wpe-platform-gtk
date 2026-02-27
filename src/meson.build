@@ -9,10 +9,11 @@ libwpeplatformgtk_sources = files(
   'wpe-view-gtk.c'
 )
 
-libwpeplatformgtk = static_library(
+libwpeplatformgtk = shared_library(
   'wpeplatform-gtk',
   sources: libwpeplatformgtk_sources,
-  dependencies: [ wpe_platform_dep, gtk_dep, epoxy_dep ]
+  dependencies: [ wpe_platform_dep, gtk_dep, epoxy_dep ],
+  install: true,
 )
 
 libwpeplatformgtk_dep = declare_dependency(link_with : libwpeplatformgtk,
