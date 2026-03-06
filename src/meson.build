@@ -1,3 +1,16 @@
+libwpeplatformgtk_header_subdir = 'wpe-platform-gtk-@0@'.format(api_version)
+
+libwpeplatformgtk_public_headers = files(
+  'wpe-display-gtk.h',
+  'wpe-toplevel-gtk.h',
+  'wpe-view-gtk.h'
+)
+
+install_headers(
+  libwpeplatformgtk_public_headers,
+  subdir: libwpeplatformgtk_header_subdir
+)
+
 libwpeplatformgtk_sources = files(
   'wpe-clipboard-gtk.c',
   'wpe-display-gtk.c',
@@ -13,7 +26,7 @@ libwpeplatformgtk = shared_library(
   'wpeplatform-gtk',
   sources: libwpeplatformgtk_sources,
   dependencies: [ wpe_platform_dep, gtk_dep, epoxy_dep ],
-  install: true,
+  install: true
 )
 
 libwpeplatformgtk_dep = declare_dependency(link_with : libwpeplatformgtk,
