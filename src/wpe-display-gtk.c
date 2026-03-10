@@ -20,6 +20,7 @@
  * SOFTWARE.
  */
 
+#include "config.h"
 #include "wpe-display-gtk.h"
 
 #include "wpe-input-method-context-gtk.h"

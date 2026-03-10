@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Igalia S.L.
+ * Copyright (c) 2026 Igalia S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,32 +20,16 @@
  * SOFTWARE.
  */
 
-#ifndef _WPE_TOPLEVEL_GTK_H_
-#define _WPE_TOPLEVEL_GTK_H_
+#pragma once
 
-#include "wpe-gtk-version.h"
-
-#include "wpe-display-gtk.h"
-#include <gtk/gtk.h>
+#include <glib.h>
 
 G_BEGIN_DECLS
 
-#define WPE_TYPE_TOPLEVEL_GTK (wpe_toplevel_gtk_get_type())
+#ifndef _WPE_GTK_EXTERN
+#define _WPE_GTK_EXTERN extern
+#endif
 
-WPE_GTK_AVAILABLE_IN_ALL
-G_DECLARE_FINAL_TYPE(WPEToplevelGtk, wpe_toplevel_gtk, WPE, TOPLEVEL_GTK, WPEToplevel)
-
-WPE_GTK_AVAILABLE_IN_ALL
-WPEToplevel *wpe_toplevel_gtk_new           (WPEDisplayGtk  *display,
-                                             guint           max_views,
-                                             GtkWindow      *window);
-
-WPE_GTK_AVAILABLE_IN_ALL
-GtkWindow   *wpe_toplevel_gtk_get_window    (WPEToplevelGtk *toplevel);
-
-WPE_GTK_AVAILABLE_IN_ALL
-gboolean     wpe_toplevel_gtk_is_in_screen  (WPEToplevelGtk *toplevel);
+#define WPE_GTK_AVAILABLE_IN_ALL _WPE_GTK_EXTERN
 
 G_END_DECLS
-
-#endif /* _WPE_TOPLEVEL_GTK_H_ */

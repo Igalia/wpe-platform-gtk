@@ -20,6 +20,7 @@
  * SOFTWARE.
  */
 
+#include "config.h"
 #include "wpe-view-gtk.h"
 
 #include "wpe-drawing-area.h"
