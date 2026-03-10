@@ -22,10 +22,20 @@ libwpeplatformgtk_sources = files(
   'wpe-view-gtk.c'
 )
 
+config_data = configuration_data()
+
+config_data.set('_WPE_GTK_EXTERN', '__attribute__((visibility("default"))) extern')
+
+configure_file(
+  output: 'config.h',
+  configuration: config_data
+)
+
 libwpeplatformgtk = shared_library(
   'wpeplatform-gtk',
   sources: libwpeplatformgtk_sources,
   dependencies: [ wpe_platform_dep, gtk_dep, epoxy_dep ],
+  gnu_symbol_visibility: 'hidden',
   install: true
 )
 

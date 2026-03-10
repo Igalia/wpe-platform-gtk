@@ -23,16 +23,25 @@
 #ifndef _WPE_VIEW_GTK_H_
 #define _WPE_VIEW_GTK_H_
 
+#include "wpe-gtk-version.h"
+
 #include "wpe-display-gtk.h"
 #include <gtk/gtk.h>
 
 G_BEGIN_DECLS
 
 #define WPE_TYPE_VIEW_GTK (wpe_view_gtk_get_type())
+
+WPE_GTK_AVAILABLE_IN_ALL
 G_DECLARE_FINAL_TYPE(WPEViewGtk, wpe_view_gtk, WPE, VIEW_GTK, WPEView)
 
+WPE_GTK_AVAILABLE_IN_ALL
 WPEView   *wpe_view_gtk_new               (WPEDisplayGtk *display);
+
+WPE_GTK_AVAILABLE_IN_ALL
 GtkWidget *wpe_view_gtk_get_widget        (WPEViewGtk    *view);
+
+WPE_GTK_AVAILABLE_IN_ALL
 void       wpe_view_gtk_show_context_menu (WPEViewGtk    *view,
                                            GMenuModel    *menu,
                                            GActionGroup  *group,
