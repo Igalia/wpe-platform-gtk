@@ -7,6 +7,7 @@ project(
 )
 
 api_version = '1.0'
+package_api_name = '@0@-@1@'.format(meson.project_name(), api_version)
 
 prefix = get_option('prefix')
 libdir = join_paths(prefix, get_option('libdir'))
