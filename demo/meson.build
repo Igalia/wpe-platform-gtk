@@ -11,5 +11,7 @@ adw_dep	= dependency('libadwaita-1', version: '>= 1.6')
 executable('wpe-gtk-demo',
   sources: demo_sources,
   dependencies: [ libwpeplatformgtk_dep, wpe_webkit_dep, adw_dep ],
-  include_directories: [ '.', '../src' ]
+  include_directories: [ '.', '../src' ],
+  install: true,
+  install_dir: get_option('bindir')
 )
