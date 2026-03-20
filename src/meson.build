@@ -55,3 +55,14 @@ giowpeplatformgtk = shared_module(
   install_dir: wpe_platform_module_dir
 )
 
+pkg = import('pkgconfig')
+
+pkg.generate(
+  libraries: libwpeplatformgtk,
+  subdirs: [ libwpeplatformgtk_header_subdir ],
+  name: 'WPE GTK Platform',
+  filebase: package_api_name,
+  description: 'GTK Platform implementation for WPE WebKit',
+  version: api_version,
+  requires: [ wpe_platform_dep, gtk_dep ]
+)
