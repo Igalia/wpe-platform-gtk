@@ -3,7 +3,8 @@ libwpeplatformgtk_header_subdir = 'wpe-platform-gtk-@0@'.format(api_version)
 libwpeplatformgtk_public_headers = files(
   'wpe-display-gtk.h',
   'wpe-toplevel-gtk.h',
-  'wpe-view-gtk.h'
+  'wpe-view-gtk.h',
+  'wpe-gtk-version.h'
 )
 
 install_headers(
