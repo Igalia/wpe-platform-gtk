@@ -20,4 +20,3 @@ epoxy_dep = dependency('epoxy', version: '>= 1.4')
 wpe_platform_module_dir = wpe_platform_dep.get_variable('moduledir', pkgconfig_define: ['libdir', join_paths(prefix, libdir)])
 
 subdir('src')
-subdir('demo')
