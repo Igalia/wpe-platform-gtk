@@ -4,7 +4,7 @@ libwpeplatformgtk_public_headers = files(
   'wpe-display-gtk.h',
   'wpe-toplevel-gtk.h',
   'wpe-view-gtk.h',
-  'wpe-gtk-version.h'
+  'wpe-platform-gtk-version.h'
 )
 
 install_headers(
@@ -25,7 +25,7 @@ libwpeplatformgtk_sources = files(
 
 config_data = configuration_data()
 
-config_data.set('_WPE_GTK_EXTERN', '__attribute__((visibility("default"))) extern')
+config_data.set('_WPE_PLATFORM_GTK_EXTERN', '__attribute__((visibility("default"))) extern')
 
 configure_file(
   output: 'config.h',

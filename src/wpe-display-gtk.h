@@ -23,7 +23,7 @@
 #ifndef _WPE_DISPLAY_GTK_H_
 #define _WPE_DISPLAY_GTK_H_
 
-#include "wpe-gtk-version.h"
+#include "wpe-platform-gtk-version.h"
 
 #include <gio/gio.h>
 #include <gtk/gtk.h>
@@ -33,16 +33,16 @@ G_BEGIN_DECLS
 
 #define WPE_TYPE_DISPLAY_GTK (wpe_display_gtk_get_type())
 
-WPE_GTK_AVAILABLE_IN_ALL
+WPE_PLATFORM_GTK_AVAILABLE_IN_ALL
 G_DECLARE_FINAL_TYPE(WPEDisplayGtk, wpe_display_gtk, WPE, DISPLAY_GTK, WPEDisplay)
 
-WPE_GTK_AVAILABLE_IN_ALL
+WPE_PLATFORM_GTK_AVAILABLE_IN_ALL
 void wpe_display_gtk_register(GIOModule *module);
 
-WPE_GTK_AVAILABLE_IN_ALL
+WPE_PLATFORM_GTK_AVAILABLE_IN_ALL
 WPEDisplay *wpe_display_gtk_new             (void);
 
-WPE_GTK_AVAILABLE_IN_ALL
+WPE_PLATFORM_GTK_AVAILABLE_IN_ALL
 GdkDisplay *wpe_display_gtk_get_gdk_display (WPEDisplayGtk *display);
 
 G_END_DECLS

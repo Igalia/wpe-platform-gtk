@@ -23,7 +23,7 @@
 #ifndef _WPE_TOPLEVEL_GTK_H_
 #define _WPE_TOPLEVEL_GTK_H_
 
-#include "wpe-gtk-version.h"
+#include "wpe-platform-gtk-version.h"
 
 #include "wpe-display-gtk.h"
 #include <gtk/gtk.h>
@@ -32,18 +32,18 @@ G_BEGIN_DECLS
 
 #define WPE_TYPE_TOPLEVEL_GTK (wpe_toplevel_gtk_get_type())
 
-WPE_GTK_AVAILABLE_IN_ALL
+WPE_PLATFORM_GTK_AVAILABLE_IN_ALL
 G_DECLARE_FINAL_TYPE(WPEToplevelGtk, wpe_toplevel_gtk, WPE, TOPLEVEL_GTK, WPEToplevel)
 
-WPE_GTK_AVAILABLE_IN_ALL
+WPE_PLATFORM_GTK_AVAILABLE_IN_ALL
 WPEToplevel *wpe_toplevel_gtk_new           (WPEDisplayGtk  *display,
                                              guint           max_views,
                                              GtkWindow      *window);
 
-WPE_GTK_AVAILABLE_IN_ALL
+WPE_PLATFORM_GTK_AVAILABLE_IN_ALL
 GtkWindow   *wpe_toplevel_gtk_get_window    (WPEToplevelGtk *toplevel);
 
-WPE_GTK_AVAILABLE_IN_ALL
+WPE_PLATFORM_GTK_AVAILABLE_IN_ALL
 gboolean     wpe_toplevel_gtk_is_in_screen  (WPEToplevelGtk *toplevel);
 
 G_END_DECLS
