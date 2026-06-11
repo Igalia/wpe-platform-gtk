@@ -31,6 +31,7 @@ struct _WPEViewGtk {
   WPEView parent;
 
   WPEDrawingArea *drawing_area;
+  GtkWidget *offload;
 };
 
 G_DEFINE_FINAL_TYPE(WPEViewGtk, wpe_view_gtk, WPE_TYPE_VIEW)
@@ -50,14 +51,14 @@ static void wpe_view_gtk_toplevel_changed(WPEView *view, GParamSpec *pspec, gpoi
     return;
 
   WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
-  if (!view_gtk->drawing_area)
+  if (!view_gtk->offload)
     return;
 
   GtkWindow *window = wpe_toplevel_gtk_get_window(WPE_TOPLEVEL_GTK(toplevel));
-  if (gtk_widget_get_root(GTK_WIDGET(view_gtk->drawing_area)) == GTK_ROOT(window))
+  if (gtk_widget_get_root(view_gtk->offload) == GTK_ROOT(window))
     return;
 
-  gtk_window_set_child(window, GTK_WIDGET(view_gtk->drawing_area));
+  gtk_window_set_child(window, view_gtk->offload);
   gtk_window_present(window);
 }
 
@@ -73,8 +74,8 @@ static void wpe_view_gtk_constructed(GObject *object)
 static void wpe_view_gtk_finalize(GObject *object)
 {
   WPEViewGtk *view_gtk = WPE_VIEW_GTK(object);
-  if (view_gtk->drawing_area)
-    g_object_remove_weak_pointer(G_OBJECT(view_gtk->drawing_area), (gpointer*)&view_gtk->drawing_area);
+  if (view_gtk->offload)
+    g_object_remove_weak_pointer(G_OBJECT(view_gtk->offload), (gpointer*)&view_gtk->offload);
 
   G_OBJECT_CLASS(wpe_view_gtk_parent_class)->finalize(object);
 }
@@ -172,7 +173,9 @@ static void wpe_view_gtk_class_init(WPEViewGtkClass *klass)
 static void wpe_view_gtk_init(WPEViewGtk *view_gtk)
 {
   view_gtk->drawing_area = WPE_DRAWING_AREA(wpe_drawing_area_new(WPE_VIEW(view_gtk)));
-  g_object_add_weak_pointer(G_OBJECT(view_gtk->drawing_area), (gpointer*)&view_gtk->drawing_area);
+
+  view_gtk->offload = gtk_graphics_offload_new(GTK_WIDGET(view_gtk->drawing_area));
+  g_object_add_weak_pointer(G_OBJECT(view_gtk->offload), (gpointer*)&view_gtk->offload);
 }
 
 WPEView *wpe_view_gtk_new(WPEDisplayGtk *display)
@@ -186,7 +189,7 @@ GtkWidget *wpe_view_gtk_get_widget(WPEViewGtk *view)
 {
   g_return_val_if_fail(WPE_IS_VIEW_GTK(view), NULL);
 
-  return GTK_WIDGET(view->drawing_area);
+  return view->offload;
 }
 
 void wpe_view_gtk_show_context_menu(WPEViewGtk *view, GMenuModel *menu, GActionGroup *group, GdkRectangle *rect)
