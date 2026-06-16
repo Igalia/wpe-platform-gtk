@@ -42,6 +42,7 @@ libwpeplatformgtk = shared_library(
 
 libwpeplatformgtk_dep = declare_dependency(link_with : libwpeplatformgtk,
   dependencies : [ wpe_platform_dep, gtk_dep ],
+  include_directories: include_directories('.'),
 )
 
 giowpeplatformgtk_sources = files(
