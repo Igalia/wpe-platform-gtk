@@ -74,6 +74,8 @@ static void wpe_view_gtk_constructed(GObject *object)
 static void wpe_view_gtk_finalize(GObject *object)
 {
   WPEViewGtk *view_gtk = WPE_VIEW_GTK(object);
+  if (view_gtk->drawing_area)
+    g_object_remove_weak_pointer(G_OBJECT(view_gtk->drawing_area), (gpointer*)&view_gtk->drawing_area);
   if (view_gtk->offload)
     g_object_remove_weak_pointer(G_OBJECT(view_gtk->offload), (gpointer*)&view_gtk->offload);
 
@@ -173,6 +175,7 @@ static void wpe_view_gtk_class_init(WPEViewGtkClass *klass)
 static void wpe_view_gtk_init(WPEViewGtk *view_gtk)
 {
   view_gtk->drawing_area = WPE_DRAWING_AREA(wpe_drawing_area_new(WPE_VIEW(view_gtk)));
+  g_object_add_weak_pointer(G_OBJECT(view_gtk->drawing_area), (gpointer*)&view_gtk->drawing_area);
 
   view_gtk->offload = gtk_graphics_offload_new(GTK_WIDGET(view_gtk->drawing_area));
   g_object_add_weak_pointer(G_OBJECT(view_gtk->offload), (gpointer*)&view_gtk->offload);
