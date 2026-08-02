@@ -36,7 +36,7 @@ struct _WPEViewGtk {
 
 G_DEFINE_FINAL_TYPE(WPEViewGtk, wpe_view_gtk, WPE_TYPE_VIEW)
 
-static void wpe_view_gtk_monitor_changed(WPEView *view, GParamSpec *pspec, gpointer user_data)
+static void wpe_view_gtk_screen_changed(WPEView *view, GParamSpec *pspec, gpointer user_data)
 {
   if (wpe_view_get_screen(view))
     wpe_view_map(view);
@@ -67,7 +67,7 @@ static void wpe_view_gtk_constructed(GObject *object)
   G_OBJECT_CLASS(wpe_view_gtk_parent_class)->constructed(object);
 
   WPEViewGtk *view_gtk = WPE_VIEW_GTK(object);
-  g_signal_connect(view_gtk, "notify::monitor", G_CALLBACK(wpe_view_gtk_monitor_changed), NULL);
+  g_signal_connect(view_gtk, "notify::screen", G_CALLBACK(wpe_view_gtk_screen_changed), NULL);
   g_signal_connect(view_gtk, "notify::toplevel", G_CALLBACK(wpe_view_gtk_toplevel_changed), NULL);
 }
 
