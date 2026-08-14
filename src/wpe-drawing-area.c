@@ -398,6 +398,36 @@ static void wpe_drawing_area_scroll_end(WPEDrawingArea *area, GtkEventController
   wpe_view_event(area->view, event);
 }
 
+static WPEModifiers wpe_modifiers_for_button_event(GdkEvent *gdk_event, GtkGesture *gesture)
+{
+  GdkModifierType state = gdk_event_get_modifier_state(gdk_event);
+  GdkModifierType button_mask;
+  switch (gtk_gesture_single_get_current_button(GTK_GESTURE_SINGLE(gesture))) {
+  case GDK_BUTTON_PRIMARY:
+    button_mask = GDK_BUTTON1_MASK;
+    break;
+  case GDK_BUTTON_MIDDLE:
+    button_mask = GDK_BUTTON2_MASK;
+    break;
+  case GDK_BUTTON_SECONDARY:
+    button_mask = GDK_BUTTON3_MASK;
+    break;
+  case 4:
+    button_mask = GDK_BUTTON4_MASK;
+    break;
+  case 5:
+    button_mask = GDK_BUTTON5_MASK;
+    break;
+  default:
+    return wpe_modifiers_for_gdk_modifiers(state);
+  }
+  if (gdk_event_get_event_type(gdk_event) == GDK_BUTTON_RELEASE)
+    state &= ~button_mask;
+  else
+    state |= button_mask;
+  return wpe_modifiers_for_gdk_modifiers(state);
+}
+
 static void wpe_drawing_area_button_pressed(WPEDrawingArea *area, int click_count, double x, double y, GtkGesture *gesture)
 {
   if (gtk_gesture_single_get_current_sequence(GTK_GESTURE_SINGLE(gesture)))
@@ -413,7 +443,7 @@ static void wpe_drawing_area_button_pressed(WPEDrawingArea *area, int click_coun
                                  area->view,
                                  wpe_input_source_for_gdk_device(gdk_event_get_device(gdk_event)),
                                  gdk_event_get_time(gdk_event),
-                                 wpe_modifiers_for_gdk_modifiers(gdk_event_get_modifier_state(gdk_event)),
+                                 wpe_modifiers_for_button_event(gdk_event, gesture),
                                  wpe_button_for_gdk_button(gtk_gesture_single_get_current_button(GTK_GESTURE_SINGLE(gesture))),
                                  x, y, click_count);
   wpe_view_event(area->view, event);
@@ -434,7 +464,7 @@ static void wpe_drawing_area_button_released(WPEDrawingArea *area, int click_cou
                                  area->view,
                                  wpe_input_source_for_gdk_device(gdk_event_get_device(gdk_event)),
                                  gdk_event_get_time(gdk_event),
-                                 wpe_modifiers_for_gdk_modifiers(gdk_event_get_modifier_state(gdk_event)),
+                                 wpe_modifiers_for_button_event(gdk_event, gesture),
                                  wpe_button_for_gdk_button(gtk_gesture_single_get_current_button(GTK_GESTURE_SINGLE(gesture))),
                                  x, y, 0);
   wpe_view_event(area->view, event);
