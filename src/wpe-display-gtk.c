@@ -121,6 +121,48 @@ static WPESettingsSubpixelLayout wpe_subpixel_layout(const char *subpixel_layout
   return WPE_SETTINGS_SUBPIXEL_LAYOUT_RGB;
 }
 
+#if GTK_CHECK_VERSION(4, 20, 0)
+static WPESettingsInterfaceContrast wpe_interface_contrast(GtkSettings *gtk_settings)
+{
+  GtkInterfaceContrast contrast;
+
+  g_object_get(gtk_settings, "gtk-interface-contrast", &contrast, NULL);
+  switch (contrast) {
+  case GTK_INTERFACE_CONTRAST_MORE:
+    return WPE_SETTINGS_INTERFACE_CONTRAST_MORE;
+  case GTK_INTERFACE_CONTRAST_LESS:
+    return WPE_SETTINGS_INTERFACE_CONTRAST_LESS;
+  default:
+    return WPE_SETTINGS_INTERFACE_CONTRAST_NO_PREFERENCE;
+  }
+}
+#endif
+
+static gboolean wpe_reduced_motion(GtkSettings *gtk_settings)
+{
+#if GTK_CHECK_VERSION(4, 22, 0)
+  GtkReducedMotion reduced_motion;
+
+  g_object_get(gtk_settings, "gtk-interface-reduced-motion", &reduced_motion, NULL);
+  return reduced_motion == GTK_REDUCED_MOTION_REDUCE;
+#else
+  gboolean animations;
+
+  g_object_get(gtk_settings, "gtk-enable-animations", &animations, NULL);
+  return !animations;
+#endif
+}
+
+/* Leaving a setting to WPE's own default, once the desktop has nothing to say
+ * about it, needs a WPE that can be handed one back; without it whatever was
+ * last reported has to stand. */
+static void forget_platform_value(WPESettings *settings G_GNUC_UNUSED, const char *key G_GNUC_UNUSED)
+{
+#if HAVE_WPE_SETTINGS_UNSET_SUPPORT
+  wpe_settings_unset(settings, key, WPE_SETTINGS_SOURCE_PLATFORM, NULL);
+#endif
+}
+
 static void color_scheme_settings_changed(GSettings *desktop_settings)
 {
   gboolean use_dark_mode = g_settings_get_enum(desktop_settings, "color-scheme") == 1;
@@ -175,9 +217,22 @@ static void gtk_settings_changed (WPEDisplayGtk *display_gtk)
     wpe_settings_set_value(settings, WPE_SETTING_FONT_ANTIALIAS, g_variant_new_boolean(font_antialias != 0), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
     wpe_settings_set_value(settings, WPE_SETTING_FONT_HINTING_STYLE, g_variant_new_byte(font_hinting != 0 ? wpe_font_hinting_style(font_hinting_style) : WPE_SETTINGS_HINTING_STYLE_NONE), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
     wpe_settings_set_value(settings, WPE_SETTING_FONT_SUBPIXEL_LAYOUT, g_variant_new_byte(wpe_subpixel_layout(subpixel_layout)), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
+  } else {
+    /* The toolkit renders as it sees fit, so there is nothing here to report. */
+    forget_platform_value(settings, WPE_SETTING_FONT_ANTIALIAS);
+    forget_platform_value(settings, WPE_SETTING_FONT_HINTING_STYLE);
+    forget_platform_value(settings, WPE_SETTING_FONT_SUBPIXEL_LAYOUT);
   }
-  wpe_settings_set_value(settings, WPE_SETTING_FONT_DPI, g_variant_new_double(font_dpi), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
+  /* GTK keeps the DPI multiplied by 1024, and reports -1 when it has none. */
+  if (font_dpi > 0)
+    wpe_settings_set_value(settings, WPE_SETTING_FONT_DPI, g_variant_new_double(font_dpi / 1024.0), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
+  else
+    forget_platform_value(settings, WPE_SETTING_FONT_DPI);
   wpe_settings_set_value(settings, WPE_SETTING_DARK_MODE, g_variant_new_boolean(dark_theme), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
+  wpe_settings_set_value(settings, WPE_SETTING_REDUCED_MOTION, g_variant_new_boolean(wpe_reduced_motion(gtk_settings)), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
+#if GTK_CHECK_VERSION(4, 20, 0)
+  wpe_settings_set_value(settings, WPE_SETTING_INTERFACE_CONTRAST, g_variant_new_byte(wpe_interface_contrast(gtk_settings)), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
+#endif
 
   g_free(font_name);
   g_free(font_hinting_style);
@@ -191,12 +246,21 @@ static void wpe_display_gtk_setup_settings(WPEDisplayGtk *display_gtk)
   g_signal_connect_swapped(gtk_settings, "notify::gtk-double-click-distance", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-cursor-blink-time", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-font-name", G_CALLBACK(gtk_settings_changed), display_gtk);
+  g_signal_connect_swapped(gtk_settings, "notify::gtk-font-rendering", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-xft-antialias", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-xft-hinting", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-xft-hintstyle", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-xft-rgba", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-xft-dpi", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-application-prefer-dark-theme", G_CALLBACK(gtk_settings_changed), display_gtk);
+#if GTK_CHECK_VERSION(4, 22, 0)
+  g_signal_connect_swapped(gtk_settings, "notify::gtk-interface-reduced-motion", G_CALLBACK(gtk_settings_changed), display_gtk);
+#else
+  g_signal_connect_swapped(gtk_settings, "notify::gtk-enable-animations", G_CALLBACK(gtk_settings_changed), display_gtk);
+#endif
+#if GTK_CHECK_VERSION(4, 20, 0)
+  g_signal_connect_swapped(gtk_settings, "notify::gtk-interface-contrast", G_CALLBACK(gtk_settings_changed), display_gtk);
+#endif
 
   gtk_settings_changed(display_gtk);
 }
