@@ -342,7 +342,7 @@ static void wpe_drawing_area_pointer_leave(WPEDrawingArea *area, GdkCrossingMode
     wpe_event_pointer_move_new(WPE_EVENT_POINTER_LEAVE,
                                area->view,
                                WPE_INPUT_SOURCE_MOUSE,
-                               0, 0, -1, -1, 0, 0);
+                               0, 0, area->last_motion_event.x, area->last_motion_event.y, 0, 0);
   wpe_view_event(area->view, event);
 }
 
