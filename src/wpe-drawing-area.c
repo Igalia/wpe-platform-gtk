@@ -338,11 +338,29 @@ static gboolean wpe_drawing_area_pointer_motion(WPEDrawingArea *area, double x, 
 
 static void wpe_drawing_area_pointer_leave(WPEDrawingArea *area, GdkCrossingMode mode, GtkEventController *controller)
 {
+  double width = wpe_view_get_width(area->view);
+  double height = wpe_view_get_height(area->view);
+  double x = area->last_motion_event.x;
+  double y = area->last_motion_event.y;
+
+  /* Calculate 1px outside position in order to hide overlay scrollbars */
+  if (x < y) {
+    if (width - x < y)
+      y = height;
+    else
+      x = -1;
+  } else {
+    if (width - x < y)
+      x = width;
+    else
+      y = -1;
+  }
+
   g_autoptr(WPEEvent) event =
     wpe_event_pointer_move_new(WPE_EVENT_POINTER_LEAVE,
                                area->view,
                                WPE_INPUT_SOURCE_MOUSE,
-                               0, 0, area->last_motion_event.x, area->last_motion_event.y, 0, 0);
+                               0, 0, x, y, 0, 0);
   wpe_view_event(area->view, event);
 }
 
