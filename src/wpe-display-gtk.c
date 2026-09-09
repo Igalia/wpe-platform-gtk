@@ -53,7 +53,7 @@ struct _WPEDisplayGtk {
   WPEClipboard *clipboard;
   GPtrArray *screens;
 
-  GSettings *desktop_settings;
+  GDBusProxy *settings_portal;
 };
 
 G_DEFINE_DYNAMIC_TYPE_EXTENDED(WPEDisplayGtk, wpe_display_gtk, WPE_TYPE_DISPLAY, G_TYPE_FLAG_FINAL, {})
@@ -65,7 +65,7 @@ static void wpe_display_gtk_finalize(GObject *object)
   g_clear_pointer(&display_gtk->screens, g_ptr_array_unref);
   g_clear_object(&display_gtk->keymap);
   g_clear_object(&display_gtk->clipboard);
-  g_clear_object(&display_gtk->desktop_settings);
+  g_clear_object(&display_gtk->settings_portal);
 
   G_OBJECT_CLASS(wpe_display_gtk_parent_class)->finalize(object);
 }
@@ -121,26 +121,6 @@ static WPESettingsSubpixelLayout wpe_subpixel_layout(const char *subpixel_layout
   return WPE_SETTINGS_SUBPIXEL_LAYOUT_RGB;
 }
 
-static void color_scheme_settings_changed(GSettings *desktop_settings)
-{
-  gboolean use_dark_mode = g_settings_get_enum(desktop_settings, "color-scheme") == 1;
-  g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", use_dark_mode, NULL);
-}
-
-static void wpe_display_gtk_setup_dark_mode(WPEDisplayGtk *display_gtk)
-{
-  if (g_file_test("/.flatpak-info", G_FILE_TEST_EXISTS))
-    return;
-
-  g_autoptr(GSettingsSchema) schema = g_settings_schema_source_lookup(g_settings_schema_source_get_default(), "org.gnome.desktop.interface", TRUE);
-  if (!schema || !g_settings_schema_has_key(schema, "color-scheme"))
-    return;
-
-  display_gtk->desktop_settings = g_settings_new("org.gnome.desktop.interface");
-  color_scheme_settings_changed(display_gtk->desktop_settings);
-  g_signal_connect(display_gtk->desktop_settings, "changed::color-scheme", G_CALLBACK(color_scheme_settings_changed), NULL);
-}
-
 static void gtk_settings_changed (WPEDisplayGtk *display_gtk)
 {
   WPESettings *settings = wpe_display_get_settings(WPE_DISPLAY(display_gtk));
@@ -152,7 +132,6 @@ static void gtk_settings_changed (WPEDisplayGtk *display_gtk)
   int font_antialias, font_hinting;
   char *font_hinting_style, *subpixel_layout;
   int font_dpi;
-  gboolean dark_theme;
   g_object_get(gtk_settings,
                "gtk-double-click-time", &double_click_time,
                "gtk-double-click-distance", &double_click_distance,
@@ -164,7 +143,6 @@ static void gtk_settings_changed (WPEDisplayGtk *display_gtk)
                "gtk-xft-hintstyle", &font_hinting_style,
                "gtk-xft-rgba", &subpixel_layout,
                "gtk-xft-dpi", &font_dpi,
-               "gtk-application-prefer-dark-theme", &dark_theme,
                NULL);
 
   wpe_settings_set_value(settings, WPE_SETTING_DOUBLE_CLICK_TIME, g_variant_new_uint32(double_click_time), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
@@ -177,11 +155,26 @@ static void gtk_settings_changed (WPEDisplayGtk *display_gtk)
     wpe_settings_set_value(settings, WPE_SETTING_FONT_SUBPIXEL_LAYOUT, g_variant_new_byte(wpe_subpixel_layout(subpixel_layout)), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
   }
   wpe_settings_set_value(settings, WPE_SETTING_FONT_DPI, g_variant_new_double(font_dpi), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
-  wpe_settings_set_value(settings, WPE_SETTING_DARK_MODE, g_variant_new_boolean(dark_theme), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
 
   g_free(font_name);
   g_free(font_hinting_style);
   g_free(subpixel_layout);
+}
+
+static void portal_settings_changed(WPEDisplayGtk *display_gtk, GDBusProxy *proxy, const char *sender, const char *signal_name, GVariant *parameters)
+{
+  // https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Settings.html
+  if (g_strcmp0(signal_name, "SettingChanged"))
+    return;
+
+  const char *namespace_, *key;
+  g_autoptr(GVariant) value = NULL;
+  g_variant_get(parameters, "(&s&sv)", &namespace_, &key, &value);
+
+  if (!g_strcmp0(namespace_, "org.freedesktop.appearance") && !g_strcmp0(key, "color-scheme")) {
+    WPESettings *settings = wpe_display_get_settings(WPE_DISPLAY(display_gtk));
+    wpe_settings_set_value(settings, WPE_SETTING_DARK_MODE, g_variant_new_boolean(g_variant_get_uint32(value) == 1), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
+  }
 }
 
 static void wpe_display_gtk_setup_settings(WPEDisplayGtk *display_gtk)
@@ -196,9 +189,34 @@ static void wpe_display_gtk_setup_settings(WPEDisplayGtk *display_gtk)
   g_signal_connect_swapped(gtk_settings, "notify::gtk-xft-hintstyle", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-xft-rgba", G_CALLBACK(gtk_settings_changed), display_gtk);
   g_signal_connect_swapped(gtk_settings, "notify::gtk-xft-dpi", G_CALLBACK(gtk_settings_changed), display_gtk);
-  g_signal_connect_swapped(gtk_settings, "notify::gtk-application-prefer-dark-theme", G_CALLBACK(gtk_settings_changed), display_gtk);
 
   gtk_settings_changed(display_gtk);
+
+  display_gtk->settings_portal = g_dbus_proxy_new_for_bus_sync(
+    G_BUS_TYPE_SESSION,
+    G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES,
+    NULL,
+    "org.freedesktop.portal.Desktop",
+    "/org/freedesktop/portal/desktop",
+    "org.freedesktop.portal.Settings",
+    NULL, NULL);
+
+  if (display_gtk->settings_portal) {
+    g_autoptr(GVariant) result = g_dbus_proxy_call_sync(
+      display_gtk->settings_portal, "ReadOne",
+      g_variant_new("(ss)", "org.freedesktop.appearance", "color-scheme"),
+      G_DBUS_CALL_FLAGS_NONE, 1000, NULL, NULL);
+
+    if (result) {
+      g_autoptr(GVariant) value = NULL;
+      g_variant_get(result, "(v)", &value);
+      guint32 dark_mode = g_variant_get_uint32(value);
+      WPESettings *wpe_settings = wpe_display_get_settings(WPE_DISPLAY(display_gtk));
+      wpe_settings_set_value(wpe_settings, WPE_SETTING_DARK_MODE, g_variant_new_boolean(dark_mode == 1), WPE_SETTINGS_SOURCE_PLATFORM, NULL);
+    }
+
+    g_signal_connect_swapped(display_gtk->settings_portal, "g-signal", G_CALLBACK(portal_settings_changed), display_gtk);
+  }
 }
 
 static gboolean wpe_display_gtk_connect(WPEDisplay *display, GError **error)
@@ -247,7 +265,6 @@ G_GNUC_END_IGNORE_DEPRECATIONS
   }
 
   wpe_display_gtk_setup_screens(display_gtk);
-  wpe_display_gtk_setup_dark_mode(display_gtk);
   wpe_display_gtk_setup_settings(display_gtk);
 
   return TRUE;
