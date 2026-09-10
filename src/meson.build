@@ -27,6 +27,11 @@ config_data = configuration_data()
 
 config_data.set('_WPE_PLATFORM_GTK_EXTERN', '__attribute__((visibility("default"))) extern')
 
+cc = meson.get_compiler('c')
+if cc.has_member('WPEViewClass', 'set_tooltip', prefix: '#include <wpe/wpe-platform.h>', dependencies: wpe_platform_dep)
+  config_data.set('HAVE_WPE_VIEW_SET_TOOLTIP', 1)
+endif
+
 configure_file(
   output: 'config.h',
   configuration: config_data

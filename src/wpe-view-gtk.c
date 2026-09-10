@@ -113,6 +113,17 @@ static void wpe_view_gtk_set_cursor_from_bytes(WPEView *view, GBytes *bytes, gui
   gtk_widget_set_cursor(GTK_WIDGET(view_gtk->drawing_area), cursor);
 }
 
+#ifdef HAVE_WPE_VIEW_SET_TOOLTIP
+static void wpe_view_gtk_set_tooltip(WPEView *view, const char *text, const WPERectangle *area)
+{
+  WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
+  if (!view_gtk->drawing_area)
+    return;
+
+  wpe_drawing_area_set_tooltip(view_gtk->drawing_area, text, area);
+}
+#endif
+
 static void wpe_view_gtk_set_opaque_rectangles(WPEView *view, WPERectangle *rects, guint n_rects)
 {
   WPEViewGtk *view_gtk = WPE_VIEW_GTK(view);
@@ -168,6 +179,9 @@ static void wpe_view_gtk_class_init(WPEViewGtkClass *klass)
   view_class->render_buffer = wpe_view_gtk_render_buffer;
   view_class->set_cursor_from_name = wpe_view_gtk_set_cursor_from_name;
   view_class->set_cursor_from_bytes = wpe_view_gtk_set_cursor_from_bytes;
+#ifdef HAVE_WPE_VIEW_SET_TOOLTIP
+  view_class->set_tooltip = wpe_view_gtk_set_tooltip;
+#endif
   view_class->set_opaque_rectangles = wpe_view_gtk_set_opaque_rectangles;
   view_class->can_be_mapped = wpe_view_gtk_can_be_mapped;
 #ifdef GTK_ACCESSIBILITY_ATSPI
