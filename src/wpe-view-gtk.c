@@ -143,6 +143,9 @@ static gboolean wpe_view_gtk_can_be_mapped(WPEView *view)
   if (!view_gtk->drawing_area || !gtk_widget_get_mapped(GTK_WIDGET(view_gtk->drawing_area)))
     return FALSE;
 
+  if (wpe_view_get_width(view) <= 0 || wpe_view_get_height(view) <= 0)
+    return FALSE;
+
   WPEToplevel *toplevel = wpe_view_get_toplevel(view);
   return toplevel ? wpe_toplevel_gtk_is_in_screen(WPE_TOPLEVEL_GTK(toplevel)) : FALSE;
 }

@@ -151,7 +151,11 @@ static void wpe_drawing_area_size_allocate(GtkWidget *widget, int width, int hei
   GTK_WIDGET_CLASS(wpe_drawing_area_parent_class)->size_allocate(widget, width, height, baseline);
 
   WPEDrawingArea *area = WPE_DRAWING_AREA(widget);
-  wpe_view_resized(area->view, width, height);
+  if (width > 0 && height > 0) {
+    wpe_view_resized(area->view, width, height);
+    if (gtk_widget_get_mapped(widget))
+      wpe_view_map(area->view);
+  }
 
   if (area->context_menu)
     gtk_popover_present(GTK_POPOVER(area->context_menu));
