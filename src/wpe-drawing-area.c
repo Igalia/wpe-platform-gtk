@@ -44,6 +44,12 @@ typedef struct {
   double y;
 } MotionEvent;
 
+typedef struct {
+  guint32 time;
+  double x;
+  double y;
+} TouchPoint;
+
 struct _WPEDrawingArea {
   GtkWidget parent;
 
@@ -52,6 +58,8 @@ struct _WPEDrawingArea {
   WPEBuffer *committed_buffer;
 
   MotionEvent last_motion_event;
+
+  GHashTable *touch_points;
 
   GtkWidget *context_menu;
 
@@ -138,6 +146,7 @@ static void wpe_drawing_area_dispose(GObject *object)
   g_clear_object(&area->pending_buffer);
   g_clear_object(&area->committed_buffer);
   g_clear_pointer(&area->context_menu, gtk_widget_unparent);
+  g_clear_pointer(&area->touch_points, g_hash_table_unref);
 
 #ifdef GTK_ACCESSIBILITY_ATSPI
   g_clear_object(&area->accessible);
@@ -205,11 +214,39 @@ static void wpe_drawing_area_map(GtkWidget *widget)
   wpe_view_map(area->view);
 }
 
+/* An unmapped widget stops receiving GDK_TOUCH_END, so outstanding touches are
+ * cancelled here to keep the web process from waiting on them forever. */
+static void wpe_drawing_area_cancel_touches(WPEDrawingArea *area)
+{
+  /* Disposing unmaps the widget again, after the table is gone. */
+  if (!area->touch_points || !g_hash_table_size(area->touch_points))
+    return;
+
+  g_autoptr(GHashTable) points = g_steal_pointer(&area->touch_points);
+  area->touch_points = g_hash_table_new_full(NULL, NULL, NULL, g_free);
+
+  GHashTableIter iter;
+  gpointer sequence, value;
+  g_hash_table_iter_init(&iter, points);
+  while (g_hash_table_iter_next(&iter, &sequence, &value)) {
+    TouchPoint *point = value;
+    g_autoptr(WPEEvent) event =
+      wpe_event_touch_new(WPE_EVENT_TOUCH_CANCEL,
+                          area->view,
+                          WPE_INPUT_SOURCE_TOUCHSCREEN,
+                          point->time,
+                          0,
+                          GPOINTER_TO_UINT(sequence), point->x, point->y);
+    wpe_view_event(area->view, event);
+  }
+}
+
 static void wpe_drawing_area_unmap(GtkWidget *widget)
 {
   GTK_WIDGET_CLASS(wpe_drawing_area_parent_class)->unmap(widget);
 
   WPEDrawingArea *area = WPE_DRAWING_AREA(widget);
+  wpe_drawing_area_cancel_touches(area);
   wpe_view_unmap(area->view);
 }
 
@@ -504,6 +541,73 @@ static gboolean wpe_drawing_area_key_released(WPEDrawingArea *area, guint keyval
   return GDK_EVENT_STOP;
 }
 
+static WPEEventType wpe_event_type_for_gdk_touch_event_type(GdkEventType type)
+{
+  switch (type) {
+  case GDK_TOUCH_BEGIN:
+    return WPE_EVENT_TOUCH_DOWN;
+  case GDK_TOUCH_UPDATE:
+    return WPE_EVENT_TOUCH_MOVE;
+  case GDK_TOUCH_END:
+    return WPE_EVENT_TOUCH_UP;
+  case GDK_TOUCH_CANCEL:
+    return WPE_EVENT_TOUCH_CANCEL;
+  default:
+    g_assert_not_reached();
+  }
+  return WPE_EVENT_TOUCH_CANCEL;
+}
+
+static gboolean wpe_drawing_area_touch_event(WPEDrawingArea *area, GdkEvent *gdk_event, GtkEventController *controller)
+{
+  GdkEventType type = gdk_event_get_event_type(gdk_event);
+  if (type != GDK_TOUCH_BEGIN && type != GDK_TOUCH_UPDATE && type != GDK_TOUCH_END && type != GDK_TOUCH_CANCEL)
+    return GDK_EVENT_PROPAGATE;
+
+  GdkEventSequence *sequence = gdk_event_get_event_sequence(gdk_event);
+  TouchPoint *point = g_hash_table_lookup(area->touch_points, sequence);
+  if (type == GDK_TOUCH_BEGIN) {
+    gtk_widget_grab_focus(GTK_WIDGET(area));
+    point = g_new0(TouchPoint, 1);
+    g_hash_table_insert(area->touch_points, sequence, point);
+  } else if (!point)
+    return GDK_EVENT_PROPAGATE;
+
+  double event_x, event_y;
+  gdk_event_get_position(gdk_event, &event_x, &event_y);
+
+  /* gdk_event_get_position() returns surface-relative coordinates, but
+   * gtk_widget_compute_point() operates in the native widget's own local
+   * coordinate space, which can be offset from the surface origin (e.g.
+   * to leave room for CSD shadows). Account for that offset first. */
+  GtkNative *native = gtk_widget_get_native(GTK_WIDGET(area));
+  double native_x, native_y;
+  gtk_native_get_surface_transform(native, &native_x, &native_y);
+
+  graphene_point_t surface_point = GRAPHENE_POINT_INIT((float)(event_x - native_x), (float)(event_y - native_y));
+  graphene_point_t area_point;
+  gboolean computed = gtk_widget_compute_point(GTK_WIDGET(native), GTK_WIDGET(area), &surface_point, &area_point);
+  g_warn_if_fail(computed);
+
+  point->time = gdk_event_get_time(gdk_event);
+  point->x = area_point.x;
+  point->y = area_point.y;
+
+  g_autoptr(WPEEvent) event =
+    wpe_event_touch_new(wpe_event_type_for_gdk_touch_event_type(type),
+                        area->view,
+                        wpe_input_source_for_gdk_device(gdk_event_get_device(gdk_event)),
+                        point->time,
+                        wpe_modifiers_for_gdk_modifiers(gdk_event_get_modifier_state(gdk_event)),
+                        GPOINTER_TO_UINT(sequence), point->x, point->y);
+  wpe_view_event(area->view, event);
+
+  if (type == GDK_TOUCH_END || type == GDK_TOUCH_CANCEL)
+    g_hash_table_remove(area->touch_points, sequence);
+
+  return GDK_EVENT_STOP;
+}
+
 static void wpe_drawing_area_init(WPEDrawingArea *area)
 {
   GtkWidget *widget = GTK_WIDGET(area);
@@ -512,6 +616,8 @@ static void wpe_drawing_area_init(WPEDrawingArea *area)
 
   area->last_motion_event.x = -1;
   area->last_motion_event.y = -1;
+
+  area->touch_points = g_hash_table_new_full(NULL, NULL, NULL, g_free);
 
   GtkEventController *controller = gtk_event_controller_focus_new();
   g_signal_connect_object(controller, "enter", G_CALLBACK(wpe_drawing_area_focus_enter), widget, G_CONNECT_SWAPPED);
@@ -540,6 +646,13 @@ static void wpe_drawing_area_init(WPEDrawingArea *area)
   controller = gtk_event_controller_key_new();
   g_signal_connect_object(controller, "key-pressed", G_CALLBACK(wpe_drawing_area_key_pressed), widget, G_CONNECT_SWAPPED);
   g_signal_connect_object(controller, "key-released", G_CALLBACK(wpe_drawing_area_key_released), widget, G_CONNECT_SWAPPED);
+  gtk_widget_add_controller(widget, controller);
+
+  /* Controllers are prepended, so adding this last makes it run before the gestures
+   * above; stopping touch events there is what keeps them from being delivered again
+   * as emulated pointer input. */
+  controller = gtk_event_controller_legacy_new();
+  g_signal_connect_object(controller, "event", G_CALLBACK(wpe_drawing_area_touch_event), widget, G_CONNECT_SWAPPED);
   gtk_widget_add_controller(widget, controller);
 }
 
