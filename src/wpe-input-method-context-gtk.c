@@ -41,6 +41,7 @@ static void input_purpose_changed_cb(WPEInputMethodContextGtk *context_gtk)
   GtkInputPurpose gtk_purpose;
   switch (wpe_input_method_context_get_input_purpose(WPE_INPUT_METHOD_CONTEXT(context_gtk))) {
   case WPE_INPUT_PURPOSE_FREE_FORM:
+  case WPE_INPUT_PURPOSE_SEARCH:
     gtk_purpose = GTK_INPUT_PURPOSE_FREE_FORM;
     break;
   case WPE_INPUT_PURPOSE_ALPHA:
