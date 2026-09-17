@@ -398,5 +398,5 @@ void wpe_display_gtk_register(GIOModule *module)
   wpe_display_gtk_register_type(G_TYPE_MODULE(module));
   if (!module)
     g_io_extension_point_register(WPE_DISPLAY_EXTENSION_POINT_NAME);
-  g_io_extension_point_implement(WPE_DISPLAY_EXTENSION_POINT_NAME, WPE_TYPE_DISPLAY_GTK, "wpe-display-gtk", 200);
+  g_io_extension_point_implement(WPE_DISPLAY_EXTENSION_POINT_NAME, WPE_TYPE_DISPLAY_GTK, "gtk", 200);
 }
