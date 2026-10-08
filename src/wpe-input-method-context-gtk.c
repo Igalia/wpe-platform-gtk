@@ -132,18 +132,20 @@ static void im_context_commit_cb(WPEInputMethodContextGtk *context_gtk, const ch
   g_signal_emit_by_name(context_gtk, "committed", text, NULL);
 }
 
-static void im_context_retrieve_surrounding_cb(WPEInputMethodContextGtk *context_gtk)
+static gboolean im_context_retrieve_surrounding_cb(WPEInputMethodContextGtk *context_gtk)
 {
   gtk_im_context_set_surrounding_with_selection(context_gtk->im_context,
                                                 context_gtk->surrounding_text,
                                                 context_gtk->surrounding_text ? -1 : 0,
                                                 context_gtk->surrounding_cursor_index,
                                                 context_gtk->surrounding_selection_index);
+  return TRUE;
 }
 
-static void im_context_delete_surrounding_cb(WPEInputMethodContextGtk *context_gtk, int offset, int n_chars)
+static gboolean im_context_delete_surrounding_cb(WPEInputMethodContextGtk *context_gtk, int offset, int n_chars)
 {
-  gtk_im_context_delete_surrounding(context_gtk->im_context, offset, n_chars);
+  g_signal_emit_by_name(context_gtk, "delete-surrounding", offset, n_chars, NULL);
+  return TRUE;
 }
 
 static void client_widget_realize_cb(WPEInputMethodContextGtk *context_gtk, GtkWidget* widget)
