@@ -24,6 +24,7 @@
 
 #include "wpe-view-gtk.h"
 #include <gtk/gtk.h>
+#include <string.h>
 
 struct _WPEInputMethodContextGtk {
   WPEInputMethodContext parent;
@@ -188,13 +189,20 @@ static void wpe_input_method_context_gtk_finalize(GObject *object)
   G_OBJECT_CLASS(wpe_input_method_context_gtk_parent_class)->finalize(object);
 }
 
+static guint character_offset_for_byte_index(const gchar *text, int index)
+{
+  gsize length = strlen(text);
+  return g_utf8_pointer_to_offset(text, text + MIN((gsize)index, length));
+}
+
 static void wpe_input_method_context_gtk_get_preedit_string(WPEInputMethodContext *context, gchar **text, GList **underlines, guint *cursor_offset)
 {
   WPEInputMethodContextGtk *context_gtk = WPE_INPUT_METHOD_CONTEXT_GTK(context);
 
+  g_autofree gchar *preedit = NULL;
   PangoAttrList* attr_list = NULL;
   int offset;
-  gtk_im_context_get_preedit_string(context_gtk->im_context, text, underlines ? &attr_list : NULL, &offset);
+  gtk_im_context_get_preedit_string(context_gtk->im_context, &preedit, underlines ? &attr_list : NULL, &offset);
 
   if (underlines) {
     *underlines = NULL;
@@ -208,7 +216,7 @@ static void wpe_input_method_context_gtk_get_preedit_string(WPEInputMethodContex
         int start, end;
         pango_attr_iterator_range(iter, &start, &end);
 
-        WPEInputMethodUnderline *underline = wpe_input_method_underline_new(start, end);
+        WPEInputMethodUnderline *underline = wpe_input_method_underline_new(character_offset_for_byte_index(preedit, start), character_offset_for_byte_index(preedit, end));
         PangoAttribute *color_attr = pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE_COLOR);
         if (color_attr) {
           PangoColor *color = &((PangoAttrColor*)color_attr)->color;
@@ -222,6 +230,9 @@ static void wpe_input_method_context_gtk_get_preedit_string(WPEInputMethodContex
   }
 
   g_clear_pointer(&attr_list, pango_attr_list_unref);
+
+  if (text)
+    *text = g_steal_pointer(&preedit);
 
   if (cursor_offset)
     *cursor_offset = offset;
