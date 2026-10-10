@@ -377,13 +377,65 @@ static gboolean wpe_drawing_area_pointer_motion(WPEDrawingArea *area, double x, 
   return GDK_EVENT_PROPAGATE;
 }
 
+static gboolean wpe_drawing_area_query_pointer_position(WPEDrawingArea *area, GtkEventController *controller, double *x, double *y)
+{
+  GtkWidget *widget = GTK_WIDGET(area);
+  GtkNative *native = gtk_widget_get_native(widget);
+  GdkSurface *surface = native ? gtk_native_get_surface(native) : NULL;
+  GdkDevice *device = gtk_event_controller_get_current_event_device(controller);
+  if (!surface || !device)
+    return FALSE;
+
+  /* This fails once the pointer left the surface. Wayland doesn't report the
+     position of a pointer which is outside of the surface. */
+  double surface_x, surface_y;
+  if (!gdk_surface_get_device_position(surface, device, &surface_x, &surface_y, NULL))
+    return FALSE;
+
+  double native_x, native_y;
+  gtk_native_get_surface_transform(native, &native_x, &native_y);
+
+  graphene_point_t point = GRAPHENE_POINT_INIT(surface_x - native_x, surface_y - native_y);
+  graphene_point_t out_point;
+  if (!gtk_widget_compute_point(GTK_WIDGET(native), widget, &point, &out_point))
+    return FALSE;
+
+  *x = out_point.x;
+  *y = out_point.y;
+  return TRUE;
+}
+
 static void wpe_drawing_area_pointer_leave(WPEDrawingArea *area, GdkCrossingMode mode, GtkEventController *controller)
 {
+  double x, y;
+  if (!wpe_drawing_area_query_pointer_position(area, controller, &x, &y)) {
+    double width = wpe_view_get_width(area->view);
+    double height = wpe_view_get_height(area->view);
+    x = area->last_motion_event.x;
+    y = area->last_motion_event.y;
+
+    /* Move the last known position 1px outside the closest edge in order to
+       hide overlay scrollbars */
+    double left = x;
+    double right = width - x;
+    double top = y;
+    double bottom = height - y;
+    double min = MIN(MIN(left, right), MIN(top, bottom));
+    if (min == left)
+      x = -1;
+    else if (min == right)
+      x = width;
+    else if (min == top)
+      y = -1;
+    else
+      y = height;
+  }
+
   g_autoptr(WPEEvent) event =
     wpe_event_pointer_move_new(WPE_EVENT_POINTER_LEAVE,
                                area->view,
                                WPE_INPUT_SOURCE_MOUSE,
-                               0, 0, area->last_motion_event.x, area->last_motion_event.y, 0, 0);
+                               0, 0, x, y, 0, 0);
   wpe_view_event(area->view, event);
 }
 
