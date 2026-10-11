@@ -27,7 +27,7 @@
 #include "wpe-clipboard-gtk.h"
 #include "wpe-keymap-gtk.h"
 #include "wpe-screen-gtk-private.h"
-#include "wpe-toplevel-gtk.h"
+#include "wpe-toplevel-gtk-private.h"
 #include "wpe-view-gtk.h"
 #include <epoxy/egl.h>
 
@@ -273,7 +273,7 @@ static WPEToplevel *wpe_display_gtk_create_toplevel(WPEDisplay *display, guint m
   if (!display_gtk->display)
     return NULL;
 
-  return wpe_toplevel_gtk_new(display_gtk, max_views, GTK_WINDOW(gtk_window_new()));
+  return wpe_toplevel_gtk_new_with_own_window(display_gtk, max_views);
 }
 
 static WPEKeymap *wpe_display_gtk_get_keymap(WPEDisplay *display)

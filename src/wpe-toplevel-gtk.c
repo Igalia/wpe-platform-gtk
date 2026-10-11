@@ -21,7 +21,7 @@
  */
 
 #include "config.h"
-#include "wpe-toplevel-gtk.h"
+#include "wpe-toplevel-gtk-private.h"
 
 #include "wpe-drawing-area.h"
 #include "wpe-screen-gtk.h"
@@ -40,6 +40,7 @@ struct _WPEToplevelGtk {
   WPEToplevel parent;
 
   GtkWindow *window;
+  gboolean owns_window;
   GdkToplevelState state;
   GList *monitors;
   GdkMonitor *current_monitor;
@@ -172,6 +173,10 @@ static void wpe_toplevel_gtk_dispose(GObject *object)
 
   wpe_toplevel_closed(WPE_TOPLEVEL(toplevel_gtk));
 
+  /* A window that WebKit asked for, like the one of the web inspector, goes away with its toplevel. */
+  if (toplevel_gtk->owns_window && toplevel_gtk->window)
+    gtk_window_destroy(toplevel_gtk->window);
+
   G_OBJECT_CLASS(wpe_toplevel_gtk_parent_class)->dispose(object);
 }
 
@@ -280,6 +285,13 @@ WPEToplevel *wpe_toplevel_gtk_new(WPEDisplayGtk *display, guint max_views, GtkWi
                       "max-views", max_views,
                       "window", window,
                       NULL);
+}
+
+WPEToplevel *wpe_toplevel_gtk_new_with_own_window(WPEDisplayGtk *display, guint max_views)
+{
+  WPEToplevel *toplevel = wpe_toplevel_gtk_new(display, max_views, GTK_WINDOW(gtk_window_new()));
+  WPE_TOPLEVEL_GTK(toplevel)->owns_window = TRUE;
+  return toplevel;
 }
 
 GtkWindow *wpe_toplevel_gtk_get_window(WPEToplevelGtk *toplevel_gtk)
