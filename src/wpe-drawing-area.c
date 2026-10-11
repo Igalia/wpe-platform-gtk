@@ -54,6 +54,7 @@ struct _WPEDrawingArea {
   GtkWidget parent;
 
   WPEView *view;
+  guint leave_toplevel_id;
   WPEBuffer *pending_buffer;
   WPEBuffer *committed_buffer;
 
@@ -125,12 +126,45 @@ static void wpe_buffer_gtk_free(WPEBufferGtk *buffer_gtk)
   g_free(buffer_gtk);
 }
 
+static void wpe_drawing_area_leave_toplevel(gpointer user_data)
+{
+  WPEDrawingArea *area = WPE_DRAWING_AREA(user_data);
+  area->leave_toplevel_id = 0;
+
+  WPEToplevel *toplevel = wpe_view_get_toplevel(area->view);
+  if (!toplevel)
+    return;
+
+  /* Letting go of the toplevel can destroy the window, and with it this widget and
+   * the view, so that must not happen inside wpe_view_set_toplevel(). */
+  g_autoptr(WPEToplevel) last_toplevel_ref = g_object_ref(toplevel);
+  wpe_view_set_toplevel(area->view, NULL);
+}
+
+/* The view keeps its toplevel alive and the window keeps this widget alive, so once
+ * WebKit lets go of the view nothing would ever release a toplevel that owns the
+ * window, like the one of the web inspector. Leaving the toplevel when only this
+ * widget holds the view breaks that cycle. It's deferred because the last reference
+ * goes away while WebKit is tearing the view down. */
+static void wpe_drawing_area_view_toggled(gpointer user_data, GObject *object, gboolean is_last_ref)
+{
+  WPEDrawingArea *area = WPE_DRAWING_AREA(user_data);
+  if (!is_last_ref) {
+    g_clear_handle_id(&area->leave_toplevel_id, g_source_remove);
+    return;
+  }
+
+  if (wpe_view_get_toplevel(WPE_VIEW(object)))
+    area->leave_toplevel_id = g_idle_add_once(wpe_drawing_area_leave_toplevel, area);
+}
+
 static void wpe_drawing_area_set_property(GObject *object, guint prop_id, const GValue *value, GParamSpec *pspec)
 {
   WPEDrawingArea *area = WPE_DRAWING_AREA(object);
   switch (prop_id) {
   case PROP_VIEW:
-    area->view = g_value_dup_object(value);
+    area->view = g_value_get_object(value);
+    g_object_add_toggle_ref(G_OBJECT(area->view), wpe_drawing_area_view_toggled, area);
     break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -142,7 +176,9 @@ static void wpe_drawing_area_dispose(GObject *object)
   WPEDrawingArea *area = WPE_DRAWING_AREA(object);
 
   wpe_view_closed(area->view);
-  g_clear_object(&area->view);
+  g_clear_handle_id(&area->leave_toplevel_id, g_source_remove);
+  g_object_remove_toggle_ref(G_OBJECT(area->view), wpe_drawing_area_view_toggled, area);
+  area->view = NULL;
   g_clear_object(&area->pending_buffer);
   g_clear_object(&area->committed_buffer);
   g_clear_pointer(&area->context_menu, gtk_widget_unparent);
