@@ -98,7 +98,7 @@ static void wpe_clipboard_gtk_changed(WPEClipboard *clipboard, GPtrArray *format
     if (formats) {
       GPtrArray *providers = g_ptr_array_sized_new(formats->len);
       gboolean textAdded = FALSE;
-      for (unsigned i = 0; formats->pdata[i]; ++i) {
+      for (unsigned i = 0; i < formats->len && formats->pdata[i]; ++i) {
         const char* internal_format = g_intern_string(formats->pdata[i]);
         if (internal_format == g_intern_static_string("text/plain") || internal_format == g_intern_static_string("text/plain;charset=utf-8")) {
           if (!textAdded) {
@@ -142,10 +142,7 @@ static void clipboard_changed_cb(GdkClipboard *clipboard, WPEClipboardGtk *clipb
   gsize n_types;
   const char* const* types = gdk_content_formats_get_mime_types(gdk_clipboard_get_formats(clipboard_gtk->clipboard), &n_types);
   if (n_types != 0) {
-    GPtrArray* formats = g_ptr_array_sized_new(n_types);
-    for (unsigned i = 0; types[i]; i++)
-      g_ptr_array_add(formats, (gpointer)types[i]);
-    g_ptr_array_add(formats, NULL);
+    GPtrArray* formats = g_ptr_array_new_take_null_terminated((gpointer*) types, NULL);
     WPE_CLIPBOARD_GET_CLASS(clipboard_gtk)->changed(WPE_CLIPBOARD(clipboard_gtk), formats, FALSE, NULL);
     g_ptr_array_unref(formats);
   }
