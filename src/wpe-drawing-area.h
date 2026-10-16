@@ -36,6 +36,9 @@ gboolean   wpe_drawing_area_render_buffer     (WPEDrawingArea     *area,
                                                const WPERectangle *damage_rects,
                                                guint               n_damage_rects,
                                                GError            **error);
+void       wpe_drawing_area_set_tooltip       (WPEDrawingArea     *area,
+                                               const char         *text,
+                                               const WPERectangle *tooltip_area);
 void       wpe_drawing_area_show_context_menu (WPEDrawingArea     *area,
                                                GMenuModel         *menu,
                                                GActionGroup       *group,

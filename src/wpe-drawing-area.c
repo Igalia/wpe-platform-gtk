@@ -59,6 +59,9 @@ struct _WPEDrawingArea {
 
   MotionEvent last_motion_event;
 
+  char *tooltip;
+  GdkRectangle tooltip_area;
+
   GHashTable *touch_points;
 
   GtkWidget *context_menu;
@@ -146,6 +149,7 @@ static void wpe_drawing_area_dispose(GObject *object)
   g_clear_object(&area->pending_buffer);
   g_clear_object(&area->committed_buffer);
   g_clear_pointer(&area->context_menu, gtk_widget_unparent);
+  g_clear_pointer(&area->tooltip, g_free);
   g_clear_pointer(&area->touch_points, g_hash_table_unref);
 
 #ifdef GTK_ACCESSIBILITY_ATSPI
@@ -195,6 +199,20 @@ static void wpe_drawing_area_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
 
   if (notify_buffer_rendered)
     wpe_view_buffer_rendered(area->view, area->committed_buffer);
+}
+
+static gboolean wpe_drawing_area_query_tooltip(GtkWidget *widget, int x, int y, gboolean keyboard_mode, GtkTooltip *tooltip)
+{
+  if (keyboard_mode)
+    return FALSE;
+
+  WPEDrawingArea *area = WPE_DRAWING_AREA(widget);
+  if (!area->tooltip)
+    return FALSE;
+
+  gtk_tooltip_set_tip_area(tooltip, area->tooltip_area.width > 0 ? &area->tooltip_area : NULL);
+  gtk_tooltip_set_text(tooltip, area->tooltip);
+  return TRUE;
 }
 
 static void wpe_drawing_area_unroot(GtkWidget *widget)
@@ -267,6 +285,7 @@ static void wpe_drawing_area_class_init(WPEDrawingAreaClass *klass)
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
   widget_class->size_allocate = wpe_drawing_area_size_allocate;
   widget_class->snapshot = wpe_drawing_area_snapshot;
+  widget_class->query_tooltip = wpe_drawing_area_query_tooltip;
   widget_class->unroot = wpe_drawing_area_unroot;
   widget_class->map = wpe_drawing_area_map;
   widget_class->unmap = wpe_drawing_area_unmap;
@@ -728,6 +747,17 @@ gboolean wpe_drawing_area_render_buffer(WPEDrawingArea *area, WPEBuffer *buffer,
   g_set_object(&area->pending_buffer, buffer);
   gtk_widget_queue_draw(GTK_WIDGET(area));
   return TRUE;
+}
+
+void wpe_drawing_area_set_tooltip(WPEDrawingArea *area, const char *text, const WPERectangle *tooltip_area)
+{
+  g_return_if_fail(WPE_IS_DRAWING_AREA(area));
+
+  g_set_str(&area->tooltip, text);
+  area->tooltip_area = tooltip_area ? (GdkRectangle) { tooltip_area->x, tooltip_area->y, tooltip_area->width, tooltip_area->height } : (GdkRectangle) { 0, };
+
+  gtk_widget_set_has_tooltip(GTK_WIDGET(area), text != NULL);
+  gtk_widget_trigger_tooltip_query(GTK_WIDGET(area));
 }
 
 void wpe_drawing_area_show_context_menu(WPEDrawingArea *area, GMenuModel *menu, GActionGroup *group, GdkRectangle *rect)
