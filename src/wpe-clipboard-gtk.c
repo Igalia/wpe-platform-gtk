@@ -142,7 +142,9 @@ static void clipboard_changed_cb(GdkClipboard *clipboard, WPEClipboardGtk *clipb
   gsize n_types;
   const char* const* types = gdk_content_formats_get_mime_types(gdk_clipboard_get_formats(clipboard_gtk->clipboard), &n_types);
   if (n_types != 0) {
-    GPtrArray* formats = g_ptr_array_new_take_null_terminated((gpointer*) types, NULL);
+    GPtrArray* formats = g_ptr_array_new_null_terminated(n_types, NULL, TRUE);
+    for (gsize i = 0; i < n_types; i++)
+      g_ptr_array_add(formats, (gpointer) g_intern_string(types[i]));
     WPE_CLIPBOARD_GET_CLASS(clipboard_gtk)->changed(WPE_CLIPBOARD(clipboard_gtk), formats, FALSE, NULL);
     g_ptr_array_unref(formats);
   }
