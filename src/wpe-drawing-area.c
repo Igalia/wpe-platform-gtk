@@ -55,7 +55,9 @@ struct _WPEDrawingArea {
 
   WPEView *view;
   WPEBuffer *pending_buffer;
+  GdkTexture *pending_texture;
   WPEBuffer *committed_buffer;
+  GdkTexture *committed_texture;
 
   MotionEvent last_motion_event;
 
@@ -81,7 +83,6 @@ G_DEFINE_FINAL_TYPE(WPEDrawingArea, wpe_drawing_area, GTK_TYPE_WIDGET)
 
 typedef struct {
   GdkDmabufTextureBuilder *builder;
-  GdkTexture *texture;
 } WPEBufferGtk;
 
 static WPEBufferGtk *wpe_buffer_gtk_create(WPEBuffer *buffer)
@@ -120,9 +121,43 @@ static WPEBufferGtk *wpe_buffer_gtk_create(WPEBuffer *buffer)
 static void wpe_buffer_gtk_free(WPEBufferGtk *buffer_gtk)
 {
   g_clear_object(&buffer_gtk->builder);
-  g_clear_object(&buffer_gtk->texture);
 
   g_free(buffer_gtk);
+}
+
+/* A buffer is given back to WebKit when the last texture made from it is destroyed: GTK keeps a
+ * texture while it may still read from it, and an offloaded texture (GtkGraphicsOffload) until the
+ * compositor released its buffer, which it may still be scanning out, for example in fullscreen.
+ * Releasing the buffer earlier lets WebKit render the next frames into memory that is still being
+ * displayed, which shows as bands of noise. */
+typedef struct {
+  GWeakRef view;
+  WPEBuffer *buffer;
+} WPEBufferRelease;
+
+static WPEBufferRelease *wpe_buffer_release_new(WPEView *view, WPEBuffer *buffer)
+{
+  WPEBufferRelease *release = g_new0(WPEBufferRelease, 1);
+  g_weak_ref_init(&release->view, view);
+  release->buffer = g_object_ref(buffer);
+  return release;
+}
+
+static void wpe_buffer_release_free(WPEBufferRelease *release)
+{
+  g_weak_ref_clear(&release->view);
+  g_object_unref(release->buffer);
+  g_free(release);
+}
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(WPEBufferRelease, wpe_buffer_release_free)
+
+static void wpe_buffer_release_texture_finalized(gpointer data, GObject *texture)
+{
+  g_autoptr(WPEBufferRelease) release = data;
+  g_autoptr(WPEView) view = g_weak_ref_get(&release->view);
+  if (view)
+    wpe_view_buffer_released(view, release->buffer);
 }
 
 static void wpe_drawing_area_set_property(GObject *object, guint prop_id, const GValue *value, GParamSpec *pspec)
@@ -144,7 +179,9 @@ static void wpe_drawing_area_dispose(GObject *object)
   wpe_view_closed(area->view);
   g_clear_object(&area->view);
   g_clear_object(&area->pending_buffer);
+  g_clear_object(&area->pending_texture);
   g_clear_object(&area->committed_buffer);
+  g_clear_object(&area->committed_texture);
   g_clear_pointer(&area->context_menu, gtk_widget_unparent);
   g_clear_pointer(&area->touch_points, g_hash_table_unref);
 
@@ -177,21 +214,17 @@ static void wpe_drawing_area_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
   gboolean notify_buffer_rendered = FALSE;
   if (area->pending_buffer) {
     notify_buffer_rendered = TRUE;
-    if (area->committed_buffer) {
-      wpe_view_buffer_released(area->view, area->committed_buffer);
-      g_object_unref(area->committed_buffer);
-    }
+    g_clear_object(&area->committed_buffer);
+    g_clear_object(&area->committed_texture);
     area->committed_buffer = g_steal_pointer(&area->pending_buffer);
+    area->committed_texture = g_steal_pointer(&area->pending_texture);
   }
 
   if (!area->committed_buffer)
     return;
 
-  WPEBufferGtk *buffer_gtk = wpe_buffer_get_user_data(area->committed_buffer);
-  if (buffer_gtk && buffer_gtk->texture) {
-    graphene_rect_t rect = GRAPHENE_RECT_INIT(0, 0, wpe_view_get_width(area->view), wpe_view_get_height(area->view));
-    gtk_snapshot_append_texture(snapshot, buffer_gtk->texture, &rect);
-  }
+  graphene_rect_t rect = GRAPHENE_RECT_INIT(0, 0, wpe_view_get_width(area->view), wpe_view_get_height(area->view));
+  gtk_snapshot_append_texture(snapshot, area->committed_texture, &rect);
 
   if (notify_buffer_rendered)
     wpe_view_buffer_rendered(area->view, area->committed_buffer);
@@ -668,9 +701,8 @@ GtkWidget *wpe_drawing_area_new(WPEView *view)
 
 static void wpe_drawing_area_update_buffer_damage(WPEDrawingArea *area, WPEBufferGtk *buffer_gtk, const WPERectangle *damage_rects, guint n_damage_rects)
 {
-  if (n_damage_rects > 0 && area->committed_buffer) {
-    WPEBufferGtk *committed_buffer_gtk = wpe_buffer_get_user_data(area->committed_buffer);
-    gdk_dmabuf_texture_builder_set_update_texture(buffer_gtk->builder, committed_buffer_gtk->texture);
+  if (n_damage_rects > 0 && area->committed_texture) {
+    gdk_dmabuf_texture_builder_set_update_texture(buffer_gtk->builder, area->committed_texture);
     cairo_region_t *region = cairo_region_create();
     for (guint i = 0; i < n_damage_rects; i++) {
       cairo_rectangle_int_t rect = { damage_rects[i].x, damage_rects[i].y, damage_rects[i].width, damage_rects[i].height };
@@ -678,54 +710,63 @@ static void wpe_drawing_area_update_buffer_damage(WPEDrawingArea *area, WPEBuffe
     }
     gdk_dmabuf_texture_builder_set_update_region(buffer_gtk->builder, region);
     cairo_region_destroy(region);
-  } else {
-    gdk_dmabuf_texture_builder_set_update_texture(buffer_gtk->builder, NULL);
-    gdk_dmabuf_texture_builder_set_update_region(buffer_gtk->builder, NULL);
   }
 }
 
-static gboolean wpe_drawing_area_ensure_texture(WPEDrawingArea *area, WPEBuffer *buffer, const WPERectangle *damage_rects, guint n_damage_rects, GError **error)
+static GdkTexture *wpe_drawing_area_create_texture(WPEDrawingArea *area, WPEBuffer *buffer, const WPERectangle *damage_rects, guint n_damage_rects, GError **error)
 {
   WPEBufferGtk* buffer_gtk = wpe_buffer_get_user_data(buffer);
   if (!buffer_gtk) {
     buffer_gtk = wpe_buffer_gtk_create(buffer);
     if (!buffer_gtk) {
       g_set_error_literal(error, WPE_VIEW_ERROR, WPE_VIEW_ERROR_RENDER_FAILED, "Failed to render buffer: unsupported buffer");
-      return FALSE;
+      return NULL;
     }
     wpe_buffer_set_user_data(buffer, buffer_gtk, (GDestroyNotify)wpe_buffer_gtk_free);
   }
 
-  g_clear_object(&buffer_gtk->texture);
-
+  g_autoptr(GdkTexture) texture = NULL;
   if (buffer_gtk->builder) {
     wpe_drawing_area_update_buffer_damage(area, buffer_gtk, damage_rects, n_damage_rects);
 
     g_autoptr(GError) buffer_error = NULL;
-    buffer_gtk->texture = gdk_dmabuf_texture_builder_build(buffer_gtk->builder, NULL, NULL, &buffer_error);
-    if (!buffer_gtk->texture) {
+    texture = gdk_dmabuf_texture_builder_build(buffer_gtk->builder, NULL, NULL, &buffer_error);
+    /* The builder would otherwise keep the previous texture, and with it the previous buffer. */
+    gdk_dmabuf_texture_builder_set_update_texture(buffer_gtk->builder, NULL);
+    gdk_dmabuf_texture_builder_set_update_region(buffer_gtk->builder, NULL);
+    if (!texture) {
       g_set_error(error, WPE_VIEW_ERROR, WPE_VIEW_ERROR_RENDER_FAILED, "Failed to render buffer: failed to build DMA-BUF texture: %s", buffer_error->message);
-      return FALSE;
+      return NULL;
     }
   } else {
-    buffer_gtk->texture = gdk_memory_texture_new(wpe_buffer_get_width(buffer),
-                                                 wpe_buffer_get_height(buffer),
-                                                 GDK_MEMORY_DEFAULT,
-                                                 wpe_buffer_shm_get_data(WPE_BUFFER_SHM(buffer)),
-                                                 wpe_buffer_shm_get_stride(WPE_BUFFER_SHM(buffer)));
+    texture = gdk_memory_texture_new(wpe_buffer_get_width(buffer),
+                                     wpe_buffer_get_height(buffer),
+                                     GDK_MEMORY_DEFAULT,
+                                     wpe_buffer_shm_get_data(WPE_BUFFER_SHM(buffer)),
+                                     wpe_buffer_shm_get_stride(WPE_BUFFER_SHM(buffer)));
+    if (!texture) {
+      g_set_error_literal(error, WPE_VIEW_ERROR, WPE_VIEW_ERROR_RENDER_FAILED, "Failed to render buffer: failed to create memory texture");
+      return NULL;
+    }
   }
 
-  return TRUE;
+  /* Memory textures have no destroy function, so both kinds are watched with a weak reference. It
+   * runs once GDK let go of a DMA-BUF, whose file descriptors the buffer keeps open until then. */
+  g_object_weak_ref(G_OBJECT(texture), wpe_buffer_release_texture_finalized, wpe_buffer_release_new(area->view, buffer));
+  return g_steal_pointer(&texture);
 }
 
 gboolean wpe_drawing_area_render_buffer(WPEDrawingArea *area, WPEBuffer *buffer, const WPERectangle *damage_rects, guint n_damage_rects, GError **error)
 {
   g_return_val_if_fail(WPE_IS_DRAWING_AREA(area), FALSE);
 
-  if (!wpe_drawing_area_ensure_texture(area, buffer, damage_rects, n_damage_rects, error))
+  /* As in WPE's Wayland platform, a buffer that fails to render is not released. */
+  g_autoptr(GdkTexture) texture = wpe_drawing_area_create_texture(area, buffer, damage_rects, n_damage_rects, error);
+  if (!texture)
     return FALSE;
 
   g_set_object(&area->pending_buffer, buffer);
+  g_set_object(&area->pending_texture, texture);
   gtk_widget_queue_draw(GTK_WIDGET(area));
   return TRUE;
 }
