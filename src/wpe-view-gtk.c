@@ -158,6 +158,16 @@ static WPEViewAccessible *wpe_view_gtk_get_accessible(WPEView *view)
 }
 #endif
 
+static gboolean wpe_view_gtk_lock_pointer(WPEView *)
+{
+  return TRUE;
+}
+
+static gboolean wpe_view_gtk_unlock_pointer(WPEView *)
+{
+  return TRUE;
+}
+
 static void wpe_view_gtk_class_init(WPEViewGtkClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS(klass);
@@ -173,6 +183,8 @@ static void wpe_view_gtk_class_init(WPEViewGtkClass *klass)
 #ifdef GTK_ACCESSIBILITY_ATSPI
   view_class->get_accessible = wpe_view_gtk_get_accessible;
 #endif
+  view_class->lock_pointer = wpe_view_gtk_lock_pointer;
+  view_class->unlock_pointer = wpe_view_gtk_unlock_pointer;
 }
 
 static void wpe_view_gtk_init(WPEViewGtk *view_gtk)
