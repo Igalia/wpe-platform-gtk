@@ -254,6 +254,13 @@ static void wpe_input_method_context_gtk_focus_in(WPEInputMethodContext *context
 {
   WPEInputMethodContextGtk *context_gtk = WPE_INPUT_METHOD_CONTEXT_GTK(context);
   gtk_im_context_focus_in(context_gtk->im_context);
+
+  /* The GTK input method context doesn't ask for the on-screen keyboard by
+   * itself. Ask for it when an editable element gets the focus, like the
+   * Wayland input method contexts of WPE Platform do, unless a script focused
+   * it without user interaction. The compositor decides whether to show it. */
+  if (!(wpe_input_method_context_get_input_hints(context) & WPE_INPUT_HINT_INHIBIT_OSK))
+    gtk_im_context_activate_osk(context_gtk->im_context, NULL);
 }
 
 static void wpe_input_method_context_gtk_focus_out(WPEInputMethodContext *context)
